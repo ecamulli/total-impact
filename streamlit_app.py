@@ -158,6 +158,7 @@ if run_report:
                         for t in location.get("types", []):
                             client_rows.append({
                                 "Location": loc_name,
+                                "Type": t.get("type").replace("_", " ").title(),
                                 "Days Back": days_back,
                                 "Client Count": client_count,
                                 "Type": t.get("type"),
