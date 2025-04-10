@@ -8,7 +8,7 @@ from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
-st.title("📊 7SIGNAL Sensor Impact Report")
+st.title("📊 7SIGNAL Total Impact Report")
 
 # Input fields
 account_name = st.text_input("Account Name")
