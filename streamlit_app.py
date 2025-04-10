@@ -229,8 +229,11 @@ if run_report:
                         if not dataframe.empty:
                             worksheet = writer.sheets[sheet_name]
                             for i, column in enumerate(dataframe.columns):
-                                column_width = max(18, dataframe[column].astype(str).map(len).max())
-                                worksheet.set_column(i, i, column_width)
+                                column_width = max(12, dataframe[column].astype(str).map(len).max())
+                                if column == "Total Critical Hours Per Day":
+                                    worksheet.set_column(i, i, 25)
+                                else:
+                                    worksheet.set_column(i, i, column_width)
 
                 output.seek(0)
 
