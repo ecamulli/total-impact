@@ -158,6 +158,7 @@ if run_report:
                         for t in location.get("types", []):
                             client_rows.append({
                                 "Location": loc_name,
+                                "Days Back": days_back,
                                 "Client Count": client_count,
                                 "Type": t.get("type"),
                                 "Good Sum": t.get("goodSum"),
@@ -198,8 +199,32 @@ if run_report:
                     if not client_df.empty:
                         client_df.to_excel(writer, index=False, sheet_name="Detailed Client Report")
 
+                        # Create Summary Client Report
+                        summary_client_df = client_df.pivot_table(
+                            index="Location",
+                            columns="Type",
+                            values="Critical Hours Per Day",
+                            aggfunc="sum"
+                        ).reset_index()
+
+                        # Rename columns
+                        summary_client_df.columns = [
+                            col if isinstance(col, str) else f"{col} Total Critical Hours Per Day"
+                            for col in summary_client_df.columns
+                        ]
+
+                        # Add total column
+                        type_cols = [col for col in summary_client_df.columns if col != "Location"]
+                        summary_client_df["Total Critical Hours Per Day"] = summary_client_df[type_cols].sum(axis=1)
+
+                        # Sort by total
+                        summary_client_df = summary_client_df.sort_values(by="Total Critical Hours Per Day", ascending=False)
+
+                        # Write to new sheet
+                        summary_client_df.to_excel(writer, index=False, sheet_name="Summary Client Report")
+
                     workbook = writer.book
-                    for sheet_name, dataframe in zip(["Detailed Sensor Report", "Summary Sensor Report", "Detailed Client Report"], [df, pivot, client_df]):
+                    for sheet_name, dataframe in zip(["Detailed Sensor Report", "Summary Sensor Report", "Detailed Client Report", "Summary Client Report"], [df, pivot, client_df, summary_client_df if not client_df.empty else pd.DataFrame()]):
                         if not dataframe.empty:
                             worksheet = writer.sheets[sheet_name]
                             for i, column in enumerate(dataframe.columns):
@@ -210,7 +235,7 @@ if run_report:
 
                 st.success("✅ Report generated!")
                 st.download_button(
-                    label="📥 Download Excel Report (3 tabs)",
+                    label="📥 Download Excel Report (4 tabs)",
                     data=output,
                     file_name=f"{account_name}_total_impact_report_{today_str}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
