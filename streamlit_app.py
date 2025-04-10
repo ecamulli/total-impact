@@ -161,7 +161,7 @@ if run_report:
                                 "Type": t.get("type").replace("_", " ").title(),
                                 "Days Back": days_back,
                                 "Client Count": client_count,
-                                "Type": t.get("type"),
+                                "Type": t.get("type").replace("_", " ").title(),
                                 "Good Sum": t.get("goodSum"),
                                 "Warning Sum": t.get("warningSum"),
                                 "Critical Sum": t.get("criticalSum"),
