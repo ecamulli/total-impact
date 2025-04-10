@@ -17,7 +17,7 @@ client_secret = st.text_input("Client Secret", type="password")
 kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
 days_back = st.number_input("Days back (max 30)", min_value=1, max_value=30, value=7)
 
-run_report = st.button("Generate Report")
+run_report = st.button("Generate Report!")
 
 def authenticate(client_id, client_secret):
     auth_data = {
