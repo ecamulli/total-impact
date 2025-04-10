@@ -7,14 +7,14 @@ import os
 from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-st.set_page_config(page_title="7SIGNAL Sensor Impact Report")
-st.title("📊 7SIGNAL Sensor Impact Report")
+st.set_page_config(page_title="7SIGNAL Total Impact Report")
+st.title("📊 7SIGNAL Total Impact Report")
 
 # Input fields
 account_name = st.text_input("Account Name")
 client_id = st.text_input("Client ID")
 client_secret = st.text_input("Client Secret", type="password")
-kpi_codes_input = st.text_input("Enter up to 4 KPI codes (comma-separated)")
+kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
 days_back = st.number_input("Days back (max 30)", min_value=1, max_value=30, value=7)
 
 run_report = st.button("Generate Impact Report")
@@ -139,6 +139,33 @@ if run_report:
                 df = pd.DataFrame(results)
                 today_str = datetime.now().strftime("%Y-%m-%d")
 
+                # Fetch client-level KPI data
+                client_url = (
+                    f"https://api-v2.7signal.com/kpis/agents/locations"
+                    f"?from={from_time}&to={to_time}"
+                    f"&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE"
+                    f"&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE"
+                    f"&band=5&includeClientCount=true"
+                )
+                client_response = safe_get(client_url, headers)
+                client_df = pd.DataFrame()
+                if client_response:
+                    client_data = client_response.json().get("results", [])
+                    client_rows = []
+                    for location in client_data:
+                        loc_name = location.get("locationName")
+                        client_count = location.get("clientCount")
+                        for t in location.get("types", []):
+                            client_rows.append({
+                                "Location": loc_name,
+                                "Client Count": client_count,
+                                "Type": t.get("type"),
+                                "Good Sum": t.get("goodSum"),
+                                "Warning Sum": t.get("warningSum"),
+                                "Critical Sum": t.get("criticalSum")
+                            })
+                    client_df = pd.DataFrame(client_rows)
+                
                 # Format pivot table with KPI columns and totals
                 pivot = df.pivot_table(
                     index=["Service Area", "Network", "Band"],
@@ -162,26 +189,30 @@ if run_report:
                 # Sort by Total Critical Hours Per Day descending
                 pivot = pivot.sort_values(by="Total Critical Hours Per Day", ascending=False)
 
-# Write both to Excel with auto-sizing columns
+                # Write both to Excel with auto-sizing columns
                 output = BytesIO()
                 with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                    df.to_excel(writer, index=False, sheet_name="Detailed Report")
-                    pivot.to_excel(writer, index=False, sheet_name="Summary Report")
+                    df.to_excel(writer, index=False, sheet_name="Detailed Sensor Report")
+                    pivot.to_excel(writer, index=False, sheet_name="Summary Sensor Report")
+                    if not client_df.empty:
+                        client_df.to_excel(writer, index=False, sheet_name="Detailed Client Report")
 
                     workbook = writer.book
-                    for sheet_name, dataframe in zip(["Detailed Report", "Summary Report"], [df, pivot]):
-                        worksheet = writer.sheets[sheet_name]
-                        for i, column in enumerate(dataframe.columns):
-                            column_width = max(23, dataframe[column].astype(str).map(len).max())
-                            worksheet.set_column(i, i, column_width)
+                    for sheet_name, dataframe in zip(["Detailed Sensor Report", "Summary Sensor Report", "Detailed Client Report"], [df, pivot, client_df]):
+                        if not dataframe.empty:
+                            worksheet = writer.sheets[sheet_name]
+                            for i, column in enumerate(dataframe.columns):
+                                column_width = max(12, dataframe[column].astype(str).map(len).max())
+                                worksheet.set_column(i, i, column_width)
 
                 output.seek(0)
 
+
                 st.success("✅ Report generated!")
                 st.download_button(
-                    label="📥 Download Excel Report (2 tabs)",
+                    label="📥 Download Excel Report (3 tabs)",
                     data=output,
-                    file_name=f"{account_name}_sensor_impact_report_{today_str}.xlsx",
+                    file_name=f"{account_name}_total_impact_report_{today_str}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
             else:
