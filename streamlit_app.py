@@ -8,7 +8,7 @@ from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
-st.title("📊 7SIGNAL Total Impact Report")
+st.title("📊 7SIGNAL Sensor Impact Report")
 
 # Input fields
 account_name = st.text_input("Account Name")
@@ -17,7 +17,7 @@ client_secret = st.text_input("Client Secret", type="password")
 kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
 days_back = st.number_input("Days back (max 30)", min_value=1, max_value=30, value=7)
 
-run_report = st.button("Generate Impact Report")
+run_report = st.button("Generate Report")
 
 def authenticate(client_id, client_secret):
     auth_data = {
@@ -162,10 +162,12 @@ if run_report:
                                 "Type": t.get("type"),
                                 "Good Sum": t.get("goodSum"),
                                 "Warning Sum": t.get("warningSum"),
-                                "Critical Sum": t.get("criticalSum")
+                                "Critical Sum": t.get("criticalSum"),
+                                "Days Back": days_back,
+                                "Critical Hours Per Day": round(min(t.get("criticalSum", 0) / 60 / days_back, 24), 2) if t.get("criticalSum") else 0
                             })
                     client_df = pd.DataFrame(client_rows)
-                
+
                 # Format pivot table with KPI columns and totals
                 pivot = df.pivot_table(
                     index=["Service Area", "Network", "Band"],
@@ -181,7 +183,6 @@ if run_report:
                 ]
                 pivot.columns = new_columns
 
-                
                 # Add Total Critical Hours Per Day column
                 kpi_cols = [col for col in pivot.columns if col not in ["Service Area", "Network", "Band"]]
                 pivot["Total Critical Hours Per Day"] = pivot[kpi_cols].sum(axis=1)
@@ -189,7 +190,7 @@ if run_report:
                 # Sort by Total Critical Hours Per Day descending
                 pivot = pivot.sort_values(by="Total Critical Hours Per Day", ascending=False)
 
-                # Write both to Excel with auto-sizing columns
+                # Write all to Excel with auto-sizing columns
                 output = BytesIO()
                 with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
                     df.to_excel(writer, index=False, sheet_name="Detailed Sensor Report")
@@ -206,7 +207,6 @@ if run_report:
                                 worksheet.set_column(i, i, column_width)
 
                 output.seek(0)
-
 
                 st.success("✅ Report generated!")
                 st.download_button(
