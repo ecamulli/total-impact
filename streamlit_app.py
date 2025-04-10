@@ -8,7 +8,7 @@ from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
-st.title("📊 7SIGNAL Total Impact Report")
+st.title("📊 7SIGNAL Sensor Impact Report")
 
 # Input fields
 account_name = st.text_input("Account Name")
@@ -17,7 +17,7 @@ client_secret = st.text_input("Client Secret", type="password")
 kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
 days_back = st.number_input("Days back (max 30)", min_value=1, max_value=30, value=7)
 
-run_report = st.button("Generate Report!")
+run_report = st.button("Generate Report")
 
 def authenticate(client_id, client_secret):
     auth_data = {
@@ -201,7 +201,7 @@ if run_report:
 
                         # Create Summary Client Report
                         summary_client_df = client_df.pivot_table(
-                            index="Location",
+                            index=["Location", "Client Count"],
                             columns="Type",
                             values="Critical Hours Per Day",
                             aggfunc="sum"
@@ -214,7 +214,7 @@ if run_report:
                         ]
 
                         # Add total column
-                        type_cols = [col for col in summary_client_df.columns if col != "Location"]
+                        type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count"]]
                         summary_client_df["Total Critical Hours Per Day"] = summary_client_df[type_cols].sum(axis=1)
 
                         # Sort by total
