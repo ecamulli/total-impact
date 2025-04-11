@@ -3,13 +3,13 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import time
-import pytz
 import os
 from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import pytz
 
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
-st.title("📊 7SIGNAL Total Impact Report")
+st.title("\ud83d\udcca 7SIGNAL Total Impact Report")
 
 # Input fields
 account_name = st.text_input("Account Name")
@@ -17,19 +17,16 @@ client_id = st.text_input("Client ID")
 client_secret = st.text_input("Client Secret", type="password")
 kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
 
-import pytz
-
-st.markdown("### ⏱️ Select Date and Time Range (Eastern Time - ET)")
-
-# Timezone
+# Timezone setup
+st.markdown("### \u23f1\ufe0f Select Date and Time Range (Eastern Time - ET)")
 eastern = pytz.timezone("US/Eastern")
 now_et = datetime.now(eastern)
 
-# Default From/To datetimes
+# Default values
 default_to = now_et
 default_from = default_to - timedelta(days=7)
 
-# Session state for picker values
+# Session state for persistent values
 if "from_date" not in st.session_state:
     st.session_state.from_date = default_from.date()
     st.session_state.from_time = default_from.time()
@@ -37,40 +34,45 @@ if "from_date" not in st.session_state:
     st.session_state.to_time = default_to.time()
 
 # Quick set button
-if st.button("📆 Set to Last 7 Days"):
+if st.button("\ud83d\udcc6 Set to Last 7 Days"):
     st.session_state.from_date = (datetime.now(eastern) - timedelta(days=7)).date()
     st.session_state.from_time = now_et.time()
     st.session_state.to_date = now_et.date()
     st.session_state.to_time = now_et.time()
 
-# Pickers (labeled with ET)
+# Pickers
 from_date = st.date_input("From Date (ET)", value=st.session_state.from_date, max_value=now_et.date())
 from_time_input = st.time_input("From Time (ET)", value=st.session_state.from_time)
 to_date = st.date_input("To Date (ET)", value=st.session_state.to_date, max_value=now_et.date())
 to_time_input = st.time_input("To Time (ET)", value=st.session_state.to_time)
 
-# Combine inputs into datetime objects
+# Combine and localize
 from_datetime_local = eastern.localize(datetime.combine(from_date, from_time_input))
 to_datetime_local = eastern.localize(datetime.combine(to_date, to_time_input))
 
-# Validate range
+# Adjust future "to" time
 if to_datetime_local > now_et:
-    st.warning("⚠️ 'To' time cannot be in the future.")
+    st.warning("\u26a0\ufe0f 'To' time cannot be in the future.")
     to_datetime_local = now_et
 
+# Validate order
 if from_datetime_local > to_datetime_local:
-    st.error("❌ 'From' datetime must be before 'To' datetime.")
+    st.error("\u274c 'From' datetime must be before 'To' datetime.")
     st.stop()
 
+# Calculate days_back with decimals
 date_range = to_datetime_local - from_datetime_local
+days_back = round(max(date_range.total_seconds() / 86400, 0.01), 2)
+
+# Enforce 30-day max range
 if days_back > 30:
-    st.error("❌ Maximum allowed date range is 30 days.")
+    st.error("\u274c Maximum allowed date range is 30 days.")
     st.stop()
+
+st.markdown(f"\ud83d\udcc6 Total time range selected: **{days_back} days**")
 
 from_timestamp = int(from_datetime_local.timestamp() * 1000)
 to_timestamp = int(to_datetime_local.timestamp() * 1000)
-days_back = round(max(date_range.total_seconds() / 86400, 0.01), 2)  # at least 0.01 days
-
 
 run_report = st.button("Generate Report!")
 
@@ -160,6 +162,7 @@ def get_kpi_data(headers, sa, net, kpi_code, from_time, to_time, days_back):
     except Exception as e:
         print(f"Error parsing KPI data: {e}")
     return results
+
 
 if run_report:
     if not all([account_name, client_id, client_secret, kpi_codes_input]):
