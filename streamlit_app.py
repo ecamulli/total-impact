@@ -16,18 +16,53 @@ client_id = st.text_input("Client ID")
 client_secret = st.text_input("Client Secret", type="password")
 kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
 
-st.markdown("### Select Time Range")
-from_date = st.date_input("From Date", value=datetime.now() - timedelta(days=7))
-from_time_input = st.time_input("From Time", value=datetime.now().time())
-to_date = st.date_input("To Date", value=datetime.now())
-to_time_input = st.time_input("To Time", value=datetime.now().time())
+st.markdown("### ⏱️ Select Date and Time Range")
 
+# Default values
+default_to = datetime.now()
+default_from = default_to - timedelta(days=7)
+
+# Session state to preserve values
+if "from_date" not in st.session_state:
+    st.session_state.from_date = default_from.date()
+    st.session_state.from_time = default_from.time()
+    st.session_state.to_date = default_to.date()
+    st.session_state.to_time = default_to.time()
+
+# Quick Set button
+if st.button("📆 Set to Last 7 Days"):
+    st.session_state.from_date = (datetime.now() - timedelta(days=7)).date()
+    st.session_state.from_time = datetime.now().time()
+    st.session_state.to_date = datetime.now().date()
+    st.session_state.to_time = datetime.now().time()
+
+# Inputs
+from_date = st.date_input("From Date", value=st.session_state.from_date, max_value=datetime.now().date())
+from_time_input = st.time_input("From Time", value=st.session_state.from_time)
+to_date = st.date_input("To Date", value=st.session_state.to_date, max_value=datetime.now().date())
+to_time_input = st.time_input("To Time", value=st.session_state.to_time)
+
+# Combine and validate range
 from_datetime = datetime.combine(from_date, from_time_input)
 to_datetime = datetime.combine(to_date, to_time_input)
 
+if to_datetime > datetime.now():
+    st.warning("⚠️ 'To' time cannot be in the future.")
+    to_datetime = datetime.now()
+
+if from_datetime > to_datetime:
+    st.error("❌ 'From' datetime must be before 'To' datetime.")
+    st.stop()
+
+date_range_days = (to_datetime - from_datetime).days
+if date_range_days > 30:
+    st.error("❌ Maximum allowed date range is 30 days.")
+    st.stop()
+
 from_timestamp = int(from_datetime.timestamp() * 1000)
 to_timestamp = int(to_datetime.timestamp() * 1000)
-days_back = max((to_datetime - from_datetime).days, 1)
+days_back = max(date_range_days, 1)
+
 
 run_report = st.button("Generate Report!")
 
