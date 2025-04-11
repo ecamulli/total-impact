@@ -34,7 +34,7 @@ if "from_date" not in st.session_state:
     st.session_state.to_time = default_to.time()
 
 # Quick set button
-if st.button("\ud83d\udcc6 Set to Last 7 Days"):
+if st.button("📆 Set to Last 7 Days"):
     st.session_state.from_date = (datetime.now(eastern) - timedelta(days=7)).date()
     st.session_state.from_time = now_et.time()
     st.session_state.to_date = now_et.date()
@@ -69,7 +69,7 @@ if days_back > 30:
     st.error("\u274c Maximum allowed date range is 30 days.")
     st.stop()
 
-st.markdown(f"\ud83d\udcc6 Total time range selected: **{days_back} days**")
+st.markdown(f"📆 Total time range selected: **{days_back} days**")
 
 from_timestamp = int(from_datetime_local.timestamp() * 1000)
 to_timestamp = int(to_datetime_local.timestamp() * 1000)
@@ -277,7 +277,7 @@ if run_report:
                 output.seek(0)
                 st.success("\u2705 Report generated!")
                 st.download_button(
-                    label="\ud83d\udcc5 Download Excel Report (4 tabs)",
+                    label="📅 Download Excel Report (4 tabs)",
                     data=output,
                     file_name=f"{account_name}_total_impact_report_{today_str}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
