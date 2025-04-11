@@ -163,7 +163,6 @@ def get_kpi_data(headers, sa, net, kpi_code, from_time, to_time, days_back):
         print(f"Error parsing KPI data: {e}")
     return results
 
-
 if run_report:
     if not all([account_name, client_id, client_secret, kpi_codes_input]):
         st.warning("Please fill out all fields.")
@@ -276,9 +275,9 @@ if run_report:
                                     worksheet.set_column(i, i, column_width)
 
                 output.seek(0)
-                st.success("✅ Report generated!")
+                st.success("\u2705 Report generated!")
                 st.download_button(
-                    label="📥 Download Excel Report (4 tabs)",
+                    label="\ud83d\udcc5 Download Excel Report (4 tabs)",
                     data=output,
                     file_name=f"{account_name}_total_impact_report_{today_str}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
