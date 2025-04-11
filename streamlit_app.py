@@ -63,7 +63,7 @@ if from_datetime_local > to_datetime_local:
     st.stop()
 
 date_range = to_datetime_local - from_datetime_local
-if date_range_days > 30:
+if days_back > 30:
     st.error("❌ Maximum allowed date range is 30 days.")
     st.stop()
 
