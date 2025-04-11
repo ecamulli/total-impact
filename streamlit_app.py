@@ -15,7 +15,20 @@ account_name = st.text_input("Account Name")
 client_id = st.text_input("Client ID")
 client_secret = st.text_input("Client Secret", type="password")
 kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
-days_back = st.number_input("Days back (max 30)", min_value=1, max_value=30, value=7)
+st.markdown("### Select Time Range")
+from_date = st.date_input("From Date", value=datetime.now() - timedelta(days=7))
+from_timestamp = st.time_input("From Time", value=datetime.now().time())
+
+to_date = st.date_input("To Date", value=datetime.now())
+to_timestamp = st.time_input("To Time", value=datetime.now().time())
+
+from_datetime = datetime.combine(from_date, from_timestamp)
+to_datetime = datetime.combine(to_date, to_timestamp)
+
+from_timestamp = int(from_datetime.timestamp() * 1000)
+to_timestamp = int(to_datetime.timestamp() * 1000)
+days_back = max((to_datetime - from_datetime).days, 1)  # still used for calculating hours/day
+
 
 run_report = st.button("Generate Report!")
 
@@ -62,10 +75,10 @@ def get_networks(headers):
     response = safe_get(url, headers)
     return response.json().get("results", []) if response else []
 
-def get_kpi_data(headers, sa, net, kpi_code, from_time, to_time, days_back):
+def get_kpi_data(headers, sa, net, kpi_code, from_timestamp, to_timestamp, days_back):
     url = (
         f"https://api-v2.7signal.com/kpis/sensors/service-areas/{sa['id']}"
-        f"?kpiCodes={kpi_code}&from={from_time}&to={to_time}&networkId={net['id']}&averaging=ALL"
+        f"?kpiCodes={kpi_code}&from={from_timestamp}&to={to_timestamp}&networkId={net['id']}&averaging=ALL"
     )
     response = safe_get(url, headers)
     if not response:
@@ -117,8 +130,8 @@ if run_report:
                 "Authorization": f"Bearer {token}"
             }
 
-            from_time = int((datetime.now() - timedelta(days=days_back)).timestamp() * 1000)
-            to_time = int(time.time() * 1000)
+            #from_time = int((datetime.now() - timedelta(days=days_back)).timestamp() * 1000)
+            #to_time = int(time.time() * 1000)
 
             st.info("Fetching service areas and networks...")
             service_areas = get_service_areas(headers)
@@ -129,7 +142,7 @@ if run_report:
             results = []
             with ThreadPoolExecutor(max_workers=8) as executor:
                 futures = [
-                    executor.submit(get_kpi_data, headers, sa, net, code, from_time, to_time, days_back)
+                    executor.submit(get_kpi_data, headers, sa, net, code, from_timestamp, to_timestamp, days_back)
                     for sa in service_areas for net in networks for code in kpi_codes
                 ]
                 for future in as_completed(futures):
@@ -142,7 +155,7 @@ if run_report:
                 # Fetch client-level KPI data
                 client_url = (
                     f"https://api-v2.7signal.com/kpis/agents/locations"
-                    f"?from={from_time}&to={to_time}"
+                    f"?from={from_timestamp}&to={to_timestamp}"
                     f"&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE"
                     f"&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE"
                     f"&band=5&includeClientCount=true"
