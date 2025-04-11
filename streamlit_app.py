@@ -62,14 +62,14 @@ if from_datetime_local > to_datetime_local:
     st.error("❌ 'From' datetime must be before 'To' datetime.")
     st.stop()
 
-date_range_days = (to_datetime_local - from_datetime_local).days
+date_range = to_datetime_local - from_datetime_local
 if date_range_days > 30:
     st.error("❌ Maximum allowed date range is 30 days.")
     st.stop()
 
 from_timestamp = int(from_datetime_local.timestamp() * 1000)
 to_timestamp = int(to_datetime_local.timestamp() * 1000)
-days_back = max(date_range_days, 1)
+days_back = round(max(date_range.total_seconds() / 86400, 0.01), 2)  # at least 0.01 days
 
 
 run_report = st.button("Generate Report!")
