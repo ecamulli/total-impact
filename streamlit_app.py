@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import time
+import pytz
 import os
 from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -16,51 +17,58 @@ client_id = st.text_input("Client ID")
 client_secret = st.text_input("Client Secret", type="password")
 kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
 
-st.markdown("### ⏱️ Select Date and Time Range")
+import pytz
 
-# Default values
-default_to = datetime.now()
+st.markdown("### ⏱️ Select Date and Time Range (Eastern Time - ET)")
+
+# Timezone
+eastern = pytz.timezone("US/Eastern")
+now_et = datetime.now(eastern)
+
+# Default From/To datetimes
+default_to = now_et
 default_from = default_to - timedelta(days=7)
 
-# Session state to preserve values
+# Session state for picker values
 if "from_date" not in st.session_state:
     st.session_state.from_date = default_from.date()
     st.session_state.from_time = default_from.time()
     st.session_state.to_date = default_to.date()
     st.session_state.to_time = default_to.time()
 
-# Quick Set button
+# Quick set button
 if st.button("📆 Set to Last 7 Days"):
-    st.session_state.from_date = (datetime.now() - timedelta(days=7)).date()
-    st.session_state.from_time = datetime.now().time()
-    st.session_state.to_date = datetime.now().date()
-    st.session_state.to_time = datetime.now().time()
+    st.session_state.from_date = (datetime.now(eastern) - timedelta(days=7)).date()
+    st.session_state.from_time = now_et.time()
+    st.session_state.to_date = now_et.date()
+    st.session_state.to_time = now_et.time()
 
-# Inputs
-from_date = st.date_input("From Date", value=st.session_state.from_date, max_value=datetime.now().date())
-from_time_input = st.time_input("From Time", value=st.session_state.from_time)
-to_date = st.date_input("To Date", value=st.session_state.to_date, max_value=datetime.now().date())
-to_time_input = st.time_input("To Time", value=st.session_state.to_time)
+# Pickers (labeled with ET)
+from_date = st.date_input("From Date (ET)", value=st.session_state.from_date, max_value=now_et.date())
+from_time_input = st.time_input("From Time (ET)", value=st.session_state.from_time)
+to_date = st.date_input("To Date (ET)", value=st.session_state.to_date, max_value=now_et.date())
+to_time_input = st.time_input("To Time (ET)", value=st.session_state.to_time)
 
-# Combine and validate range
-from_datetime = datetime.combine(from_date, from_time_input)
-to_datetime = datetime.combine(to_date, to_time_input)
+# Combine inputs into datetime objects
+from_datetime_local = eastern.localize(datetime.combine(from_date, from_time_input))
+to_datetime_local = eastern.localize(datetime.combine(to_date, to_time_input))
 
-if to_datetime > datetime.now():
+# Validate range
+if to_datetime_local > now_et:
     st.warning("⚠️ 'To' time cannot be in the future.")
-    to_datetime = datetime.now()
+    to_datetime_local = now_et
 
-if from_datetime > to_datetime:
+if from_datetime_local > to_datetime_local:
     st.error("❌ 'From' datetime must be before 'To' datetime.")
     st.stop()
 
-date_range_days = (to_datetime - from_datetime).days
+date_range_days = (to_datetime_local - from_datetime_local).days
 if date_range_days > 30:
     st.error("❌ Maximum allowed date range is 30 days.")
     st.stop()
 
-from_timestamp = int(from_datetime.timestamp() * 1000)
-to_timestamp = int(to_datetime.timestamp() * 1000)
+from_timestamp = int(from_datetime_local.timestamp() * 1000)
+to_timestamp = int(to_datetime_local.timestamp() * 1000)
 days_back = max(date_range_days, 1)
 
 
