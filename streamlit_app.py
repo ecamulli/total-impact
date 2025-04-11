@@ -136,9 +136,11 @@ def get_kpi_data(headers, sa, net, kpi_code, from_time, to_time, days_back):
                 for measurement in result.get(band, []):
                     samples = measurement.get("samples")
                     sla_value = measurement.get("slaValue")
-                    critical_samples = round(samples * (1 - sla_value / 100), 2) if samples and sla_value else None
-                    raw_critical_hours = critical_samples / 60 / days_back if critical_samples else None
-                    critical_hours_per_day = round(min(raw_critical_hours, 24), 2) if raw_critical_hours else None
+                    total_minutes = (to_time - from_time) / 1000 / 60
+                    minutes_per_sample = total_minutes / samples if samples else 0
+                    critical_samples = round(samples * (1 - sla_value / 100), 2) if samples and sla_value else 0
+                    critical_minutes = critical_samples * minutes_per_sample
+                    critical_hours_per_day = round(min(critical_minutes / 60 / days_back, 24), 2)
 
                     pretty_band = ("2.4GHz" if band == "measurements24GHz" else
                                    "5.0GHz" if band == "measurements5GHz" else
