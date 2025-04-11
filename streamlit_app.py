@@ -15,23 +15,23 @@ account_name = st.text_input("Account Name")
 client_id = st.text_input("Client ID")
 client_secret = st.text_input("Client Secret", type="password")
 kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
+
 st.markdown("### Select Time Range")
 from_date = st.date_input("From Date", value=datetime.now() - timedelta(days=7))
-from_timestamp = st.time_input("From Time", value=datetime.now().time())
-
+from_time_input = st.time_input("From Time", value=datetime.now().time())
 to_date = st.date_input("To Date", value=datetime.now())
-to_timestamp = st.time_input("To Time", value=datetime.now().time())
+to_time_input = st.time_input("To Time", value=datetime.now().time())
 
-from_datetime = datetime.combine(from_date, from_timestamp)
-to_datetime = datetime.combine(to_date, to_timestamp)
+from_datetime = datetime.combine(from_date, from_time_input)
+to_datetime = datetime.combine(to_date, to_time_input)
 
 from_timestamp = int(from_datetime.timestamp() * 1000)
 to_timestamp = int(to_datetime.timestamp() * 1000)
-days_back = max((to_datetime - from_datetime).days, 1)  # still used for calculating hours/day
-
+days_back = max((to_datetime - from_datetime).days, 1)
 
 run_report = st.button("Generate Report!")
 
+# --- authentication & utilities ---
 def authenticate(client_id, client_secret):
     auth_data = {
         "client_id": client_id,
@@ -75,10 +75,10 @@ def get_networks(headers):
     response = safe_get(url, headers)
     return response.json().get("results", []) if response else []
 
-def get_kpi_data(headers, sa, net, kpi_code, from_timestamp, to_timestamp, days_back):
+def get_kpi_data(headers, sa, net, kpi_code, from_time, to_time, days_back):
     url = (
         f"https://api-v2.7signal.com/kpis/sensors/service-areas/{sa['id']}"
-        f"?kpiCodes={kpi_code}&from={from_timestamp}&to={to_timestamp}&networkId={net['id']}&averaging=ALL"
+        f"?kpiCodes={kpi_code}&from={from_time}&to={to_time}&networkId={net['id']}&averaging=ALL"
     )
     response = safe_get(url, headers)
     if not response:
@@ -130,9 +130,6 @@ if run_report:
                 "Authorization": f"Bearer {token}"
             }
 
-            #from_time = int((datetime.now() - timedelta(days=days_back)).timestamp() * 1000)
-            #to_time = int(time.time() * 1000)
-
             st.info("Fetching service areas and networks...")
             service_areas = get_service_areas(headers)
             networks = get_networks(headers)
@@ -152,7 +149,6 @@ if run_report:
                 df = pd.DataFrame(results)
                 today_str = datetime.now().strftime("%Y-%m-%d")
 
-                # Fetch client-level KPI data
                 client_url = (
                     f"https://api-v2.7signal.com/kpis/agents/locations"
                     f"?from={from_timestamp}&to={to_timestamp}"
@@ -174,16 +170,13 @@ if run_report:
                                 "Type": t.get("type").replace("_", " ").title(),
                                 "Days Back": days_back,
                                 "Client Count": client_count,
-                                "Type": t.get("type").replace("_", " ").title(),
                                 "Good Sum": t.get("goodSum"),
                                 "Warning Sum": t.get("warningSum"),
                                 "Critical Sum": t.get("criticalSum"),
-                                "Days Back": days_back,
                                 "Critical Hours Per Day": round(min(t.get("criticalSum", 0) / 60 / days_back, 24), 2) if t.get("criticalSum") else 0
                             })
                     client_df = pd.DataFrame(client_rows)
 
-                # Format pivot table with KPI columns and totals
                 pivot = df.pivot_table(
                     index=["Service Area", "Network", "Band"],
                     columns="KPI Name",
@@ -191,21 +184,14 @@ if run_report:
                     aggfunc="sum"
                 ).reset_index()
 
-                # Rename columns to include ' Critical Hours Per Day'
-                new_columns = [
+                pivot.columns = [
                     col if isinstance(col, str) else f"{col} Critical Hours Per Day"
                     for col in pivot.columns
                 ]
-                pivot.columns = new_columns
-
-                # Add Total Critical Hours Per Day column
                 kpi_cols = [col for col in pivot.columns if col not in ["Service Area", "Network", "Band"]]
                 pivot["Total Critical Hours Per Day"] = pivot[kpi_cols].sum(axis=1)
-
-                # Sort by Total Critical Hours Per Day descending
                 pivot = pivot.sort_values(by="Total Critical Hours Per Day", ascending=False)
 
-                # Write all to Excel with auto-sizing columns
                 output = BytesIO()
                 with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
                     df.to_excel(writer, index=False, sheet_name="Detailed Sensor Report")
@@ -213,7 +199,6 @@ if run_report:
                     if not client_df.empty:
                         client_df.to_excel(writer, index=False, sheet_name="Detailed Client Report")
 
-                        # Create Summary Client Report
                         summary_client_df = client_df.pivot_table(
                             index=["Location", "Client Count"],
                             columns="Type",
@@ -221,24 +206,20 @@ if run_report:
                             aggfunc="sum"
                         ).reset_index()
 
-                        # Rename columns
                         summary_client_df.columns = [
                             col if isinstance(col, str) else f"{col} Total Critical Hours Per Day"
                             for col in summary_client_df.columns
                         ]
-
-                        # Add total column
                         type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count"]]
                         summary_client_df["Total Critical Hours Per Day"] = summary_client_df[type_cols].sum(axis=1)
-
-                        # Sort by total
                         summary_client_df = summary_client_df.sort_values(by="Total Critical Hours Per Day", ascending=False)
-
-                        # Write to new sheet
                         summary_client_df.to_excel(writer, index=False, sheet_name="Summary Client Report")
 
                     workbook = writer.book
-                    for sheet_name, dataframe in zip(["Detailed Sensor Report", "Summary Sensor Report", "Detailed Client Report", "Summary Client Report"], [df, pivot, client_df, summary_client_df if not client_df.empty else pd.DataFrame()]):
+                    for sheet_name, dataframe in zip(
+                        ["Detailed Sensor Report", "Summary Sensor Report", "Detailed Client Report", "Summary Client Report"],
+                        [df, pivot, client_df, summary_client_df if not client_df.empty else pd.DataFrame()]
+                    ):
                         if not dataframe.empty:
                             worksheet = writer.sheets[sheet_name]
                             for i, column in enumerate(dataframe.columns):
@@ -249,7 +230,6 @@ if run_report:
                                     worksheet.set_column(i, i, column_width)
 
                 output.seek(0)
-
                 st.success("✅ Report generated!")
                 st.download_button(
                     label="📥 Download Excel Report (4 tabs)",
