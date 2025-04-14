@@ -307,6 +307,7 @@ if run_report:
                     for row_idx, row in enumerate(df.values):
                         for col_idx, val in enumerate(row):
                             table.cell(row_idx + 1, col_idx).text = str(val)
+                            cell.text_frame.paragraphs[0].font.size = Pt(10)
                 
                 # Slide 1: Summary Sensor title
                 slide1 = prs.slides.add_slide(prs.slide_layouts[0])
