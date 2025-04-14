@@ -7,6 +7,10 @@ import os
 from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pytz
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
+from pptx.dml.color import RGBColor
 
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
 st.title("📊 7SIGNAL Total Impact Report")
@@ -277,6 +281,59 @@ if run_report:
                                     worksheet.set_column(i, i, column_width)
 
                 output.seek(0)
+
+                # Create the PowerPoint presentation
+                prs = Presentation()
+                
+                # Helper function to add a table slide
+                def add_table_slide(prs, title_text, df):
+                    slide_layout = prs.slide_layouts[5]  # Blank layout
+                    slide = prs.slides.add_slide(slide_layout)
+                
+                    # Table data
+                    rows, cols = df.shape
+                    left = Inches(0.5)
+                    top = Inches(1.0)
+                    width = Inches(9)
+                    height = Inches(0.8 + 0.3 * rows)
+                
+                    table = slide.shapes.add_table(rows + 1, cols, left, top, width, height).table
+                
+                    # Headers
+                    for col_idx, col_name in enumerate(df.columns):
+                        table.cell(0, col_idx).text = col_name
+                
+                    # Fill table
+                    for row_idx, row in enumerate(df.values):
+                        for col_idx, val in enumerate(row):
+                            table.cell(row_idx + 1, col_idx).text = str(val)
+                
+                # Slide 1: Summary Sensor title
+                slide1 = prs.slides.add_slide(prs.slide_layouts[0])
+                slide1.shapes.title.text = "📊 Summary Sensor Report"
+                slide1.placeholders[1].text = f"Top KPIs sorted by Critical Hours Per Day — {today_str}"
+                
+                # Slide 2: Sensor Table
+                if not pivot.empty:
+                    top10_sensor = pivot.head(10)
+                    add_table_slide(prs, "Top 10 Sensor Impact Areas", top10_sensor)
+                
+                # Slide 3: Summary Client title
+                slide3 = prs.slides.add_slide(prs.slide_layouts[0])
+                slide3.shapes.title.text = "👥 Summary Client Report"
+                slide3.placeholders[1].text = f"Client-based performance summary — {today_str}"
+                
+                # Slide 4: Client Table
+                if not summary_client_df.empty:
+                    top10_client = summary_client_df.head(10)
+                    add_table_slide(prs, "Top 10 Client Impact Areas", top10_client)
+                
+                # Save to in-memory BytesIO
+                ppt_output = BytesIO()
+                prs.save(ppt_output)
+                ppt_output.seek(0)
+                
+                                
                 st.success("\u2705 Report generated!")
                 st.download_button(
                     label="📅 Download Excel Report (4 tabs)",
@@ -284,5 +341,14 @@ if run_report:
                     file_name=f"{account_name}_total_impact_report_{today_str}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
+                st.download_button(
+                    label="📽 Download PowerPoint Summary",
+                    data=ppt_output,
+                    file_name=f"{account_name}_total_impact_summary_{today_str}.pptx",
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                )
+
+
             else:
                 st.warning("No results found.")
