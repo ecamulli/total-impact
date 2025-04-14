@@ -1,5 +1,7 @@
 streamlit
 pandas
 requests
-XlsxWriter
-pip install python-pptx
+tqdm
+openpyxl
+python-pptx
+pytz
