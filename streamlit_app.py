@@ -182,6 +182,12 @@ if run_report:
                 with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
                     df.to_excel(writer, sheet_name="Detailed Sensor Report", index=False)
                     pivot.to_excel(writer, sheet_name="Summary Sensor Report", index=False)
+
+                    workbook = writer.book
+                    for sheet_name in writer.sheets:
+                        worksheet = writer.sheets[sheet_name]
+                        for i, column in enumerate(df.columns):
+                            worksheet.set_column(i, i, 18)  # Set column width to 18
                 output.seek(0)
 
                 # PowerPoint output
