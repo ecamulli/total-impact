@@ -9,76 +9,14 @@ import pytz
 from pptx import Presentation
 from pptx.util import Inches, Pt
 
-@st.cache_data
-def generate_excel_report(df, pivot, client_df, summary_client_df):
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df.to_excel(writer, sheet_name="Detailed Sensor Report", index=False)
-        pivot.to_excel(writer, sheet_name="Summary Sensor Report", index=False)
-        if not client_df.empty:
-            client_df.to_excel(writer, sheet_name="Detailed Client Report", index=False)
-        if not summary_client_df.empty:
-            summary_client_df.to_excel(writer, sheet_name="Summary Client Report", index=False)
-        for sheet_name, data in {
-            "Detailed Sensor Report": df,
-            "Summary Sensor Report": pivot,
-            "Detailed Client Report": client_df,
-            "Summary Client Report": summary_client_df
-        }.items():
-            if not data.empty:
-                worksheet = writer.sheets[sheet_name]
-                for i, col in enumerate(data.columns):
-                    worksheet.set_column(i, i, 20)
-    output.seek(0)
-    return output
-
-@st.cache_data
-def generate_ppt_summary(pivot, summary_client_df):
-    prs = Presentation()
-
-    def add_table_slide(df, title):
-        title_slide = prs.slides.add_slide(prs.slide_layouts[0])
-        title_slide.shapes.title.text = title
-        if len(title_slide.placeholders) > 1:
-            title_slide.placeholders[1].text = f"Top 10 by Critical Hours — {datetime.now().strftime('%Y-%m-%d')}"
-        slide = prs.slides.add_slide(prs.slide_layouts[5])
-        table = slide.shapes.add_table(df.shape[0] + 1, df.shape[1], Inches(0.5), Inches(1), Inches(9), Inches(0.3 * df.shape[0])).table
-        for i, col in enumerate(df.columns):
-            table.cell(0, i).text = str(col)
-        for i, row in enumerate(df.values):
-            for j, val in enumerate(row):
-                cell = table.cell(i + 1, j)
-                cell.text = str(val)
-                cell.text_frame.paragraphs[0].font.size = Pt(10)
-
-    add_table_slide(pivot.head(10), "📊 Summary Sensor Report")
-    if not summary_client_df.empty:
-        add_table_slide(summary_client_df.head(10), "👥 Summary Client Report")
-
-    ppt_output = BytesIO()
-    prs.save(ppt_output)
-    ppt_output.seek(0)
-    return ppt_output
-
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
 st.title("📊 7SIGNAL Total Impact Report")
 
-# Initialize session state
-if "report_ready" not in st.session_state:
-    st.session_state.report_ready = False
-    st.session_state.excel_output = None
-    st.session_state.ppt_output = None
-    st.session_state.base_filename = None
-
-
 # Input fields
-with st.form("input_form"):
-    st.session_state.account_name = st.text_input("Account Name", value=st.session_state.get("account_name", ""))
-    st.session_state.client_id = st.text_input("Client ID", value=st.session_state.get("client_id", ""))
-    st.session_state.client_secret = st.text_input("Client Secret", type="password", value=st.session_state.get("client_secret", ""))
-    st.session_state.kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)", value=st.session_state.get("kpi_codes_input", ""))
-
-    submitted = st.form_submit_button("Generate Report!")
+account_name = st.text_input("Account Name")
+client_id = st.text_input("Client ID")
+client_secret = st.text_input("Client Secret", type="password")
+kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
 
 # Time range setup
 st.markdown("### ⏱️ Select Date and Time Range (Eastern Time - ET)")
@@ -128,7 +66,7 @@ to_ts = int(to_datetime.timestamp() * 1000)
 def authenticate(cid, secret):
     try:
         r = requests.post("https://api-v2.7signal.com/oauth2/token", data={
-            "st.session_state.client_id": cid, "st.session_state.client_secret": secret, "grant_type": "client_credentials"
+            "client_id": cid, "client_secret": secret, "grant_type": "client_credentials"
         }, headers={"Content-Type": "application/x-www-form-urlencoded"})
         return r.json().get("access_token") if r.status_code == 200 else None
     except:
@@ -172,12 +110,12 @@ def get_kpi_data(headers, sa, net, code, from_ts, to_ts, days_back):
                 })
     return results
 
-if submitted:
-    if not all([st.session_state.account_name, st.session_state.client_id, st.session_state.client_secret, st.session_state.kpi_codes_input]):
+if st.button("Generate Report!"):
+    if not all([account_name, client_id, client_secret, kpi_codes_input]):
         st.warning("All fields are required.")
         st.stop()
 
-    token = authenticate(st.session_state.client_id, st.session_state.client_secret)
+    token = authenticate(client_id, client_secret)
     if not token:
         st.error("❌ Authentication failed")
         st.stop()
@@ -185,7 +123,7 @@ if submitted:
     headers = {"Authorization": f"Bearer {token}"}
     service_areas = get_service_areas(headers)
     networks = get_networks(headers)
-    kpi_codes = [k.strip() for k in st.session_state.kpi_codes_input.split(',')][:4]
+    kpi_codes = [k.strip() for k in kpi_codes_input.split(',')][:4]
 
     results = []
     with ThreadPoolExecutor(max_workers=6) as ex:
@@ -277,12 +215,9 @@ if submitted:
     prs.save(ppt_output)
     ppt_output.seek(0)
 
-    excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
-    ppt_output = generate_ppt_summary(pivot, summary_client_df)
-
     from_str = from_datetime.strftime("%Y-%m-%d")
     to_str = to_datetime.strftime("%Y-%m-%d")
-    base_filename = f"{st.session_state.account_name}_impact_report_from_{from_str}_to_{to_str}"
+    base_filename = f"{account_name}_impact_report_from_{from_str}_to_{to_str}"
 
     st.download_button("📅 Download Excel Report", data=excel_output,
         file_name=f"{base_filename}.xlsx",
@@ -290,25 +225,4 @@ if submitted:
 
     st.download_button("📽 Download PowerPoint Summary", data=ppt_output,
         file_name=f"{base_filename}.pptx",
-        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
-
-
-if st.session_state.get("report_ready"):
-    st.download_button("📅 Download Excel Report", data=st.session_state['excel_output'],
-        file_name=f"{st.session_state['base_filename']}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-    st.download_button("📽 Download PowerPoint Summary", data=st.session_state['ppt_output'],
-        file_name=f"{st.session_state['base_filename']}.pptx",
-        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
-
-if st.session_state.report_ready:
-    st.download_button("📅 Download Excel Report",
-        data=st.session_state.excel_output,
-        file_name=f"{st.session_state.base_filename}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-    st.download_button("📽 Download PowerPoint Summary",
-        data=st.session_state.ppt_output,
-        file_name=f"{st.session_state.base_filename}.pptx",
         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
