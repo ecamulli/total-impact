@@ -9,6 +9,57 @@ import pytz
 from pptx import Presentation
 from pptx.util import Inches, Pt
 
+@st.cache_data
+def generate_excel_report(df, pivot, client_df, summary_client_df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, sheet_name="Detailed Sensor Report", index=False)
+        pivot.to_excel(writer, sheet_name="Summary Sensor Report", index=False)
+        if not client_df.empty:
+            client_df.to_excel(writer, sheet_name="Detailed Client Report", index=False)
+        if not summary_client_df.empty:
+            summary_client_df.to_excel(writer, sheet_name="Summary Client Report", index=False)
+        for sheet_name, data in {
+            "Detailed Sensor Report": df,
+            "Summary Sensor Report": pivot,
+            "Detailed Client Report": client_df,
+            "Summary Client Report": summary_client_df
+        }.items():
+            if not data.empty:
+                worksheet = writer.sheets[sheet_name]
+                for i, col in enumerate(data.columns):
+                    worksheet.set_column(i, i, 20)
+    output.seek(0)
+    return output
+
+@st.cache_data
+def generate_ppt_summary(pivot, summary_client_df):
+    prs = Presentation()
+
+    def add_table_slide(df, title):
+        title_slide = prs.slides.add_slide(prs.slide_layouts[0])
+        title_slide.shapes.title.text = title
+        if len(title_slide.placeholders) > 1:
+            title_slide.placeholders[1].text = f"Top 10 by Critical Hours — {datetime.now().strftime('%Y-%m-%d')}"
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
+        table = slide.shapes.add_table(df.shape[0] + 1, df.shape[1], Inches(0.5), Inches(1), Inches(9), Inches(0.3 * df.shape[0])).table
+        for i, col in enumerate(df.columns):
+            table.cell(0, i).text = str(col)
+        for i, row in enumerate(df.values):
+            for j, val in enumerate(row):
+                cell = table.cell(i + 1, j)
+                cell.text = str(val)
+                cell.text_frame.paragraphs[0].font.size = Pt(10)
+
+    add_table_slide(pivot.head(10), "📊 Summary Sensor Report")
+    if not summary_client_df.empty:
+        add_table_slide(summary_client_df.head(10), "👥 Summary Client Report")
+
+    ppt_output = BytesIO()
+    prs.save(ppt_output)
+    ppt_output.seek(0)
+    return ppt_output
+
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
 st.title("📊 7SIGNAL Total Impact Report")
 
