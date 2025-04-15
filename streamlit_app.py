@@ -90,7 +90,8 @@ def get_networks(headers):
 def get_kpi_data(headers, sa, net, code, from_ts, to_ts, days_back):
     url = f"https://api-v2.7signal.com/kpis/sensors/service-areas/{sa['id']}?kpiCodes={code}&from={from_ts}&to={to_ts}&networkId={net['id']}&averaging=ALL"
     r = safe_get(url, headers)
-    if not r: return []
+    if not r:
+        return []
     results = []
     for result in r.json().get("results", []):
         for band in ["measurements24GHz", "measurements5GHz", "measurements6GHz"]:
@@ -138,7 +139,6 @@ if st.button("Generate Report!"):
     df = pd.DataFrame(results)
     pivot = df.groupby(['Service Area', 'Network', 'Band'])['Critical Hours Per Day'].sum().reset_index()
 
-    # Client data
     client_url = (f"https://api-v2.7signal.com/kpis/agents/locations?from={from_ts}&to={to_ts}"
                   f"&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE"
                   f"&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE&band=5&includeClientCount=true")
@@ -168,7 +168,6 @@ if st.button("Generate Report!"):
             summary_client_df["Total Critical Hours Per Day"] = summary_client_df[type_cols].sum(axis=1)
             summary_client_df = summary_client_df.sort_values(by="Total Critical Hours Per Day", ascending=False)
 
-    # Excel export
     output = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         df.to_excel(writer, sheet_name="Detailed Sensor Report", index=False)
@@ -189,37 +188,32 @@ if st.button("Generate Report!"):
                     worksheet.set_column(i, i, 20)
     output.seek(0)
 
-    # PowerPoint export
     prs = Presentation()
+
     def add_table_slide(df, title):
-    title_slide = prs.slides.add_slide(prs.slide_layouts[0])
-    title_slide.shapes.title.text = title
-    if len(title_slide.placeholders) > 1:
-        title_slide.placeholders[1].text = f"Top 10 by Critical Hours — {datetime.now().strftime('%Y-%m-%d')}"
-    slide = prs.slides.add_slide(prs.slide_layouts[5])
-        table = slide.shapes.add_table(df.shape[0]+1, df.shape[1], Inches(0.5), Inches(1), Inches(9), Inches(0.3 * df.shape[0])).table
-        for i, col in enumerate(df.columns): table.cell(0, i).text = str(col)
+        title_slide = prs.slides.add_slide(prs.slide_layouts[0])
+        title_slide.shapes.title.text = title
+        if len(title_slide.placeholders) > 1:
+            title_slide.placeholders[1].text = f"Top 10 by Critical Hours — {datetime.now().strftime('%Y-%m-%d')}"
+
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
+        table = slide.shapes.add_table(df.shape[0] + 1, df.shape[1], Inches(0.5), Inches(1), Inches(9), Inches(0.3 * df.shape[0])).table
+        for i, col in enumerate(df.columns):
+            table.cell(0, i).text = str(col)
         for i, row in enumerate(df.values):
             for j, val in enumerate(row):
-                cell = table.cell(i+1, j)
+                cell = table.cell(i + 1, j)
                 cell.text = str(val)
                 cell.text_frame.paragraphs[0].font.size = Pt(10)
 
-    slide1 = prs.slides.add_slide(prs.slide_layouts[0])
-    slide1.shapes.title.text = "📊 Summary Sensor Report"
-    slide1.placeholders[1].text = f"Top KPIs by Critical Hours — {datetime.now().strftime('%Y-%m-%d')}"
-    add_table_slide(pivot.head(10), "Top 10 Sensor Impact")
+    add_table_slide(pivot.head(10), "📊 Summary Sensor Report")
 
     if not summary_client_df.empty:
-        slide2 = prs.slides.add_slide(prs.slide_layouts[0])
-        slide2.shapes.title.text = "👥 Summary Client Report"
-        slide2.placeholders[1].text = f"Top Clients by Impact — {datetime.now().strftime('%Y-%m-%d')}"
-        add_table_slide(summary_client_df.head(10), "Top 10 Clients")
+        add_table_slide(summary_client_df.head(10), "👥 Summary Client Report")
 
     ppt_output = BytesIO()
     prs.save(ppt_output)
     ppt_output.seek(0)
 
-    # Downloads
     st.download_button("📅 Download Excel Report", data=output, file_name=f"{account_name}_report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     st.download_button("📽 Download PowerPoint Summary", data=ppt_output, file_name=f"{account_name}_summary.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
