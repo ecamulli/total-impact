@@ -202,7 +202,13 @@ if client_response:
             })
 client_df = pd.DataFrame(client_rows)
 
-if not client_df.empty:
+# Excel output
+output = BytesIO()
+with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+    df.to_excel(writer, sheet_name="Detailed Sensor Report", index=False)
+    pivot.to_excel(writer, sheet_name="Summary Sensor Report", index=False)
+
+    if not client_df.empty:
     client_df.to_excel(writer, sheet_name="Detailed Client Report", index=False)
     summary_client_df = client_df.pivot_table(
         index=["Location", "Client Count"],
