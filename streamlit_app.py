@@ -72,10 +72,13 @@ if "report_ready" not in st.session_state:
 
 
 # Input fields
-st.session_state.account_name = st.text_input("Account Name", value=st.session_state.get("st.session_state.account_name", ""))
-st.session_state.client_id = st.text_input("Client ID", value=st.session_state.get("st.session_state.client_id", ""))
-st.session_state.client_secret = st.text_input("Client Secret", type="password", value=st.session_state.get("st.session_state.client_secret", ""))
-st.session_state.kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)", value=st.session_state.get("st.session_state.kpi_codes_input", ""))
+with st.form("input_form"):
+    st.session_state.account_name = st.text_input("Account Name", value=st.session_state.get("account_name", ""))
+    st.session_state.client_id = st.text_input("Client ID", value=st.session_state.get("client_id", ""))
+    st.session_state.client_secret = st.text_input("Client Secret", type="password", value=st.session_state.get("client_secret", ""))
+    st.session_state.kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)", value=st.session_state.get("kpi_codes_input", ""))
+
+    submitted = st.form_submit_button("Generate Report!"))
 
 # Time range setup
 st.markdown("### ⏱️ Select Date and Time Range (Eastern Time - ET)")
@@ -169,7 +172,7 @@ def get_kpi_data(headers, sa, net, code, from_ts, to_ts, days_back):
                 })
     return results
 
-if st.button("Generate Report!"):
+if submitted:
     if not all([st.session_state.account_name, st.session_state.client_id, st.session_state.client_secret, st.session_state.kpi_codes_input]):
         st.warning("All fields are required.")
         st.stop()
