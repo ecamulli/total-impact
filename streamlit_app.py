@@ -84,11 +84,6 @@ if "from_date" not in st.session_state:
     st.session_state.to_date = default_to.date()
     st.session_state.to_time = default_to.time()
 
-if st.button("📆 Set to Last 7 Days"):
-    st.session_state.from_date = (datetime.now(eastern) - timedelta(days=7)).date()
-    st.session_state.from_time = now_et.time()
-    st.session_state.to_date = now_et.date()
-    st.session_state.to_time = now_et.time()
 
 from_date = st.date_input("From Date (ET)", value=st.session_state.from_date)
 from_time_input = st.time_input("From Time (ET)", value=st.session_state.from_time)
