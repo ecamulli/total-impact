@@ -203,6 +203,7 @@ if client_response:
 client_df = pd.DataFrame(client_rows)
 
 # Excel output
+# Excel output
 output = BytesIO()
 with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
     df.to_excel(writer, sheet_name="Detailed Sensor Report", index=False)
@@ -225,8 +226,6 @@ with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
     summary_client_df["Total Critical Hours Per Day"] = summary_client_df[type_cols].sum(axis=1)
     summary_client_df = summary_client_df.sort_values(by="Total Critical Hours Per Day", ascending=False)
     summary_client_df.to_excel(writer, sheet_name="Summary Client Report", index=False)
-
-                # Excel output
                 output = BytesIO()
                 with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
                     df.to_excel(writer, sheet_name="Detailed Sensor Report", index=False)
