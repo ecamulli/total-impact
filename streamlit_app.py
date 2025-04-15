@@ -150,7 +150,8 @@ def get_kpi_data(headers, sa, net, code, from_ts, to_ts, days_back):
                 crit_samples = round(samples * (1 - sla / 100), 2)
                 crit_mins = crit_samples * (total_mins / samples) if samples else 0
                 results.append({
-                    "Service Area": sa['name'], "Network": net['name'], "Band": band.replace("measurements", "").replace("GHz", ".0GHz"),
+                    "Service Area": sa['name'], "Network": net['name'], "Band": {"measurements24GHz": "2.4GHz", "measurements5GHz": "5GHz", "measurements6GHz": "6GHz"}.get(band, band),
+
                     "Days Back": days_back, "KPI Code": result.get("kpiCode"), "KPI Name": result.get("name"),
                     "Samples": samples, "SLA Value": sla, "KPI Value": m.get("kpiValue"), "Status": m.get("status"),
                     "Target Value": m.get("targetValue"), "Critical Samples": crit_samples,
