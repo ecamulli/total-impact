@@ -78,7 +78,7 @@ with st.form("input_form"):
     st.session_state.client_secret = st.text_input("Client Secret", type="password", value=st.session_state.get("client_secret", ""))
     st.session_state.kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)", value=st.session_state.get("kpi_codes_input", ""))
 
-    submitted = st.form_submit_button("Generate Report!"))
+    submitted = st.form_submit_button("Generate Report!")
 
 # Time range setup
 st.markdown("### ⏱️ Select Date and Time Range (Eastern Time - ET)")
