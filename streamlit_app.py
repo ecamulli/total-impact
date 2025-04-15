@@ -72,10 +72,10 @@ if "report_ready" not in st.session_state:
 
 
 # Input fields
-st.session_state.account_name = st.text_input("Account Name", value=st.session_state.get("account_name", ""))
-st.session_state.client_id = st.text_input("Client ID", value=st.session_state.get("client_id", ""))
-st.session_state.client_secret = st.text_input("Client Secret", type="password", value=st.session_state.get("client_secret", ""))
-st.session_state.kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)", value=st.session_state.get("kpi_codes_input", ""))
+st.session_state.account_name = st.text_input("Account Name", value=st.session_state.get("st.session_state.account_name", ""))
+st.session_state.client_id = st.text_input("Client ID", value=st.session_state.get("st.session_state.client_id", ""))
+st.session_state.client_secret = st.text_input("Client Secret", type="password", value=st.session_state.get("st.session_state.client_secret", ""))
+st.session_state.kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)", value=st.session_state.get("st.session_state.kpi_codes_input", ""))
 
 # Time range setup
 st.markdown("### ⏱️ Select Date and Time Range (Eastern Time - ET)")
@@ -125,7 +125,7 @@ to_ts = int(to_datetime.timestamp() * 1000)
 def authenticate(cid, secret):
     try:
         r = requests.post("https://api-v2.7signal.com/oauth2/token", data={
-            "client_id": cid, "client_secret": secret, "grant_type": "client_credentials"
+            "st.session_state.client_id": cid, "st.session_state.client_secret": secret, "grant_type": "client_credentials"
         }, headers={"Content-Type": "application/x-www-form-urlencoded"})
         return r.json().get("access_token") if r.status_code == 200 else None
     except:
@@ -170,11 +170,11 @@ def get_kpi_data(headers, sa, net, code, from_ts, to_ts, days_back):
     return results
 
 if st.button("Generate Report!"):
-    if not all([account_name, client_id, client_secret, kpi_codes_input]):
+    if not all([st.session_state.account_name, st.session_state.client_id, st.session_state.client_secret, st.session_state.kpi_codes_input]):
         st.warning("All fields are required.")
         st.stop()
 
-    token = authenticate(client_id, client_secret)
+    token = authenticate(st.session_state.client_id, st.session_state.client_secret)
     if not token:
         st.error("❌ Authentication failed")
         st.stop()
@@ -182,7 +182,7 @@ if st.button("Generate Report!"):
     headers = {"Authorization": f"Bearer {token}"}
     service_areas = get_service_areas(headers)
     networks = get_networks(headers)
-    kpi_codes = [k.strip() for k in kpi_codes_input.split(',')][:4]
+    kpi_codes = [k.strip() for k in st.session_state.kpi_codes_input.split(',')][:4]
 
     results = []
     with ThreadPoolExecutor(max_workers=6) as ex:
@@ -279,7 +279,7 @@ if st.button("Generate Report!"):
 
     from_str = from_datetime.strftime("%Y-%m-%d")
     to_str = to_datetime.strftime("%Y-%m-%d")
-    base_filename = f"{account_name}_impact_report_from_{from_str}_to_{to_str}"
+    base_filename = f"{st.session_state.account_name}_impact_report_from_{from_str}_to_{to_str}"
 
     st.download_button("📅 Download Excel Report", data=excel_output,
         file_name=f"{base_filename}.xlsx",
