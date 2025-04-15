@@ -28,7 +28,7 @@ def generate_excel_report(df, pivot, client_df, summary_client_df):
             if not data.empty:
                 worksheet = writer.sheets[sheet_name]
                 for i, col in enumerate(data.columns):
-                    worksheet.set_column(i, i, 20)
+                    worksheet.set_column(i, i, 22)
     output.seek(0)
     return output
 
