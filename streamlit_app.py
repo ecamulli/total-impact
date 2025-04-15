@@ -187,7 +187,7 @@ if run_report:
                     for sheet_name in writer.sheets:
                         worksheet = writer.sheets[sheet_name]
                         for i, column in enumerate(df.columns):
-                            worksheet.set_column(i, i, 18)  # Set column width to 18
+                            worksheet.set_column(i, i, 20)  # Set column width to 20
                 output.seek(0)
 
                 # PowerPoint output
