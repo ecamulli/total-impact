@@ -63,11 +63,19 @@ def generate_ppt_summary(pivot, summary_client_df):
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
 st.title("📊 7SIGNAL Total Impact Report")
 
+# Initialize session state
+if "report_ready" not in st.session_state:
+    st.session_state.report_ready = False
+    st.session_state.excel_output = None
+    st.session_state.ppt_output = None
+    st.session_state.base_filename = None
+
+
 # Input fields
-account_name = st.text_input("Account Name")
-client_id = st.text_input("Client ID")
-client_secret = st.text_input("Client Secret", type="password")
-kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
+st.session_state.account_name = st.text_input("Account Name", value=st.session_state.get("account_name", ""))
+st.session_state.client_id = st.text_input("Client ID", value=st.session_state.get("client_id", ""))
+st.session_state.client_secret = st.text_input("Client Secret", type="password", value=st.session_state.get("client_secret", ""))
+st.session_state.kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)", value=st.session_state.get("kpi_codes_input", ""))
 
 # Time range setup
 st.markdown("### ⏱️ Select Date and Time Range (Eastern Time - ET)")
@@ -289,4 +297,15 @@ if st.session_state.get("report_ready"):
 
     st.download_button("📽 Download PowerPoint Summary", data=st.session_state['ppt_output'],
         file_name=f"{st.session_state['base_filename']}.pptx",
+        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+
+if st.session_state.report_ready:
+    st.download_button("📅 Download Excel Report",
+        data=st.session_state.excel_output,
+        file_name=f"{st.session_state.base_filename}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+    st.download_button("📽 Download PowerPoint Summary",
+        data=st.session_state.ppt_output,
+        file_name=f"{st.session_state.base_filename}.pptx",
         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
