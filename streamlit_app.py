@@ -215,14 +215,17 @@ if st.button("Generate Report!"):
     prs.save(ppt_output)
     ppt_output.seek(0)
 
+    excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
+    ppt_output = generate_ppt_summary(pivot, summary_client_df)
+
     from_str = from_datetime.strftime("%Y-%m-%d")
     to_str = to_datetime.strftime("%Y-%m-%d")
     base_filename = f"{account_name}_impact_report_from_{from_str}_to_{to_str}"
 
-    st.download_button("📅 Download Excel Report", data=output,
-    file_name=f"{base_filename}.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    st.download_button("📅 Download Excel Report", data=excel_output,
+        file_name=f"{base_filename}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     st.download_button("📽 Download PowerPoint Summary", data=ppt_output,
-    file_name=f"{base_filename}.pptx",
-    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+        file_name=f"{base_filename}.pptx",
+        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
