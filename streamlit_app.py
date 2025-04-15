@@ -280,3 +280,13 @@ if st.button("Generate Report!"):
     st.download_button("📽 Download PowerPoint Summary", data=ppt_output,
         file_name=f"{base_filename}.pptx",
         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+
+
+if st.session_state.get("report_ready"):
+    st.download_button("📅 Download Excel Report", data=st.session_state['excel_output'],
+        file_name=f"{st.session_state['base_filename']}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+    st.download_button("📽 Download PowerPoint Summary", data=st.session_state['ppt_output'],
+        file_name=f"{st.session_state['base_filename']}.pptx",
+        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
