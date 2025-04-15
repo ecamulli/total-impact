@@ -60,6 +60,8 @@ def generate_ppt_summary(pivot, summary_client_df):
     ppt_output.seek(0)
     return ppt_output
 
+
+
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
 st.title("📊 7SIGNAL Total Impact Report")
 
