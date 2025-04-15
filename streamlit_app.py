@@ -175,7 +175,50 @@ if run_report:
 
                 # --- Sample: Generate dummy summary tables ---
                 pivot = df.groupby(['Service Area', 'Network', 'Band']).agg({'Critical Hours Per Day': 'sum'}).reset_index()
-                client_df = pd.DataFrame({})  # Replace with real client_df logic
+                client_url = (
+    f"https://api-v2.7signal.com/kpis/agents/locations"
+    f"?from={from_timestamp}&to={to_timestamp}"
+    f"&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE"
+    f"&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE"
+    f"&band=5&includeClientCount=true"
+)
+client_response = safe_get(client_url, headers)
+client_rows = []
+if client_response:
+    client_data = client_response.json().get("results", [])
+    for location in client_data:
+        loc_name = location.get("locationName")
+        client_count = location.get("clientCount")
+        for t in location.get("types", []):
+            client_rows.append({
+                "Location": loc_name,
+                "Type": t.get("type").replace("_", " ").title(),
+                "Days Back": days_back,
+                "Client Count": client_count,
+                "Good Sum": t.get("goodSum"),
+                "Warning Sum": t.get("warningSum"),
+                "Critical Sum": t.get("criticalSum"),
+                "Critical Hours Per Day": round(min(t.get("criticalSum", 0) / 60 / days_back, 24), 2) if t.get("criticalSum") else 0
+            })
+client_df = pd.DataFrame(client_rows)
+
+if not client_df.empty:
+    client_df.to_excel(writer, sheet_name="Detailed Client Report", index=False)
+    summary_client_df = client_df.pivot_table(
+        index=["Location", "Client Count"],
+        columns="Type",
+        values="Critical Hours Per Day",
+        aggfunc="sum"
+    ).reset_index()
+
+    summary_client_df.columns = [
+        col if isinstance(col, str) else f"{col} Total Critical Hours Per Day"
+        for col in summary_client_df.columns
+    ]
+    type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count"]]
+    summary_client_df["Total Critical Hours Per Day"] = summary_client_df[type_cols].sum(axis=1)
+    summary_client_df = summary_client_df.sort_values(by="Total Critical Hours Per Day", ascending=False)
+    summary_client_df.to_excel(writer, sheet_name="Summary Client Report", index=False)
 
                 # Excel output
                 output = BytesIO()
@@ -208,7 +251,13 @@ if run_report:
                 slide1.shapes.title.text = "📊 Summary Sensor Report"
                 slide1.placeholders[1].text = f"Top KPIs by Critical Hours — {today_str}"
 
-                add_table_slide(prs, "Top 10", pivot.head(10))
+                add_table_slide(prs, "Top 10 Sensor Impact Areas", pivot.head(10))
+
+                if not client_df.empty:
+                    slide2 = prs.slides.add_slide(prs.slide_layouts[0])
+                    slide2.shapes.title.text = "👥 Summary Client Report"
+                    slide2.placeholders[1].text = f"Top Client Impacts — {today_str}"
+                    add_table_slide(prs, "Top 10 Client Impact Areas", summary_client_df.head(10))
 
                 ppt_output = BytesIO()
                 prs.save(ppt_output)
