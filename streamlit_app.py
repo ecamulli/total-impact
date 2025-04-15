@@ -192,6 +192,9 @@ if st.button("Generate Report!"):
     # PowerPoint export
     prs = Presentation()
     def add_table_slide(df, title):
+    slide_title = prs.slides.add_slide(prs.slide_layouts[0])
+    slide_title.shapes.title.text = title
+    slide_title.placeholders[1].text = f"Top 10 by Critical Hours — {datetime.now().strftime('%Y-%m-%d')}"
         slide = prs.slides.add_slide(prs.slide_layouts[5])
         table = slide.shapes.add_table(df.shape[0]+1, df.shape[1], Inches(0.5), Inches(1), Inches(9), Inches(0.3 * df.shape[0])).table
         for i, col in enumerate(df.columns): table.cell(0, i).text = str(col)
