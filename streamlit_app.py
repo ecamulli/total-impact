@@ -194,7 +194,8 @@ if st.button("Generate Report!"):
     def add_table_slide(df, title):
     title_slide = prs.slides.add_slide(prs.slide_layouts[0])
     title_slide.shapes.title.text = title
-    title_slide.placeholders[1].text = f"Top 10 by Critical Hours — {datetime.now().strftime('%Y-%m-%d')}"
+    if len(title_slide.placeholders) > 1:
+        title_slide.placeholders[1].text = f"Top 10 by Critical Hours — {datetime.now().strftime('%Y-%m-%d')}"
     slide = prs.slides.add_slide(prs.slide_layouts[5])
         table = slide.shapes.add_table(df.shape[0]+1, df.shape[1], Inches(0.5), Inches(1), Inches(9), Inches(0.3 * df.shape[0])).table
         for i, col in enumerate(df.columns): table.cell(0, i).text = str(col)
