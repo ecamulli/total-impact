@@ -209,7 +209,7 @@ with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
     pivot.to_excel(writer, sheet_name="Summary Sensor Report", index=False)
 
     if not client_df.empty:
-    client_df.to_excel(writer, sheet_name="Detailed Client Report", index=False)
+        client_df.to_excel(writer, sheet_name="Detailed Client Report", index=False)
     summary_client_df = client_df.pivot_table(
         index=["Location", "Client Count"],
         columns="Type",
