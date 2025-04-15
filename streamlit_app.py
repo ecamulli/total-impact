@@ -186,7 +186,13 @@ if st.button("Generate Report!"):
         st.stop()
 
     df = pd.DataFrame(results)
-    pivot = df.groupby(['Service Area', 'Network', 'Band'])['Critical Hours Per Day'].sum().reset_index()
+    pivot = (
+    df.groupby(['Service Area', 'Network', 'Band'])['Critical Hours Per Day']
+    .sum()
+    .reset_index()
+    .sort_values(by="Critical Hours Per Day", ascending=False)
+    )
+
 
     client_url = (f"https://api-v2.7signal.com/kpis/agents/locations?from={from_ts}&to={to_ts}"
                   f"&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE"
@@ -199,10 +205,11 @@ if st.button("Generate Report!"):
             for t in loc.get("types", []):
                 rows.append({
                     "Location": loc.get("locationName"), "Client Count": loc.get("clientCount"),
+                    "Days Back": days_back,
                     "Type": t.get("type").replace("_", " ").title(),
                     "Critical Sum": t.get("criticalSum"),
-                    "Critical Hours Per Day": round(min((t.get("criticalSum", 0) or 0) / 60 / days_back, 24), 2),
-                    "Days Back": days_back
+                    "Critical Hours Per Day": round(min((t.get("criticalSum", 0) or 0) / 60 / days_back, 24), 2)
+                    
                 })
         client_df = pd.DataFrame(rows)
 
