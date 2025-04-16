@@ -235,9 +235,7 @@ if st.button("Generate Report!"):
             summary_client_df["Avg Critical Hours Per Day"] = summary_client_df[renamed_type_cols].mean(axis=1).round(2)
 
             
-            avg_col = summary_client_df[type_cols].mean(axis=1).round(2)
-            summary_client_df["Avg Critical Hours Per Day"] = avg_col
-
+            
 
     excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
     ppt_output = generate_ppt_summary(pivot, summary_client_df)
