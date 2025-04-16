@@ -60,8 +60,6 @@ def generate_ppt_summary(pivot, summary_client_df):
     ppt_output.seek(0)
     return ppt_output
 
-
-
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
 st.title("📊 7SIGNAL Total Impact Report")
 
@@ -84,7 +82,6 @@ if "from_date" not in st.session_state:
     st.session_state.to_date = default_to.date()
     st.session_state.to_time = default_to.time()
 
-
 from_date = st.date_input("From Date (ET)", value=st.session_state.from_date)
 from_time_input = st.time_input("From Time (ET)", value=st.session_state.from_time)
 to_date = st.date_input("To Date (ET)", value=st.session_state.to_date)
@@ -106,7 +103,7 @@ if days_back > 30:
     st.error("❌ Range cannot exceed 30 days")
     st.stop()
 
-st.markdown(f"📆 Selected Range: **{days_back} days**")
+st.markdown(f"🗓 Selected Range: **{days_back} days**")
 from_ts = int(from_datetime.timestamp() * 1000)
 to_ts = int(to_datetime.timestamp() * 1000)
 
@@ -151,7 +148,6 @@ def get_kpi_data(headers, sa, net, code, from_ts, to_ts, days_back):
                 crit_mins = crit_samples * (total_mins / samples) if samples else 0
                 results.append({
                     "Service Area": sa['name'], "Network": net['name'], "Band": {"measurements24GHz": "2.4GHz", "measurements5GHz": "5GHz", "measurements6GHz": "6GHz"}.get(band, band),
-
                     "Days Back": days_back, "KPI Code": result.get("kpiCode"), "KPI Name": result.get("name"),
                     "Samples": samples, "SLA Value": sla, "KPI Value": m.get("kpiValue"), "Status": m.get("status"),
                     "Target Value": m.get("targetValue"), "Critical Samples": crit_samples,
@@ -185,7 +181,7 @@ if st.button("Generate Report!"):
         st.warning("No results found.")
         st.stop()
 
-        df = pd.DataFrame(results)
+    df = pd.DataFrame(results)
     pivot = (
         df.groupby(['Service Area', 'Network', 'Band'])['Critical Hours Per Day']
             .mean()
@@ -222,15 +218,12 @@ if st.button("Generate Report!"):
             values="Critical Hours Per Day",
             aggfunc="mean"
         ).reset_index()
-
         summary_client_df.insert(1, "Days Back", days_back)
-
         if not summary_client_df.empty:
             type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count", "Days Back"]]
             summary_client_df[type_cols] = summary_client_df[type_cols].round(2)
             summary_client_df = summary_client_df.rename(columns={col: f"{col} (Avg)" for col in type_cols})
 
-    # ✅ Use clean helper functions to generate and serve downloads
     excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
     ppt_output = generate_ppt_summary(pivot, summary_client_df)
 
@@ -238,10 +231,10 @@ if st.button("Generate Report!"):
     to_str = to_datetime.strftime("%Y-%m-%d")
     base_filename = f"{account_name}_impact_report_from_{from_str}_to_{to_str}"
 
-    st.download_button("📅 Download Excel Report", data=excel_output,
+    st.download_button("🗕 Download Excel Report", data=excel_output,
         file_name=f"{base_filename}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-    st.download_button("📽 Download PowerPoint Summary", data=ppt_output,
+    st.download_button("🎮 Download PowerPoint Summary", data=ppt_output,
         file_name=f"{base_filename}.pptx",
         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
