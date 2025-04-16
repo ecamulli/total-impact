@@ -28,7 +28,7 @@ def generate_excel_report(df, pivot, client_df, summary_client_df):
             if not data.empty:
                 worksheet = writer.sheets[sheet_name]
                 for i, col in enumerate(data.columns):
-                    worksheet.set_column(i, i, 25)
+                    worksheet.set_column(i, i, 21)
     output.seek(0)
     return output
 
@@ -188,13 +188,11 @@ if st.button("Generate Report!"):
     df = pd.DataFrame(results)
     pivot = (
     df.groupby(['Service Area', 'Network', 'Band'])['Critical Hours Per Day']
-    .mean()
+    .sum()
     .reset_index()
     .sort_values(by="Critical Hours Per Day", ascending=False)
     )
-    pivot.insert(1, "Days Back", days_back)
-    pivot["Critical Hours Per Day"] = pivot["Critical Hours Per Day"].round(2)
-    pivot = pivot.rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per Day"})
+
 
     client_url = (f"https://api-v2.7signal.com/kpis/agents/locations?from={from_ts}&to={to_ts}"
                   f"&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE"
@@ -216,31 +214,16 @@ if st.button("Generate Report!"):
         client_df = pd.DataFrame(rows)
 
     summary_client_df = pd.DataFrame()
-
     if not client_df.empty:
-        summary_client_df = client_df.pivot_table(
-            index=["Location", "Client Count"],
-            columns="Type",
-            values="Critical Hours Per Day",
-            aggfunc="mean"
-        ).reset_index()
+        summary_client_df = client_df.pivot_table(index=["Location", "Client Count"],
+                                                  columns="Type",
+                                                  values="Critical Hours Per Day",
+                                                  aggfunc="sum").reset_index()
+        if not summary_client_df.empty:
+            type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count"]]
+            summary_client_df["Total Critical Hours Per Day"] = summary_client_df[type_cols].sum(axis=1)
+            summary_client_df = summary_client_df.sort_values(by="Total Critical Hours Per Day", ascending=False)
 
-    # Insert Days Back as second column
-    summary_client_df.insert(1, "Days Back", days_back)
-
-    if not summary_client_df.empty:
-        # Identify just the KPI type columns
-        type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count", "Days Back"]]
-
-        # Round each KPI average to 2 decimal places
-        summary_client_df[type_cols] = summary_client_df[type_cols].round(2)
-
-        # Optional: Rename columns for clarity (if needed)
-        summary_client_df = summary_client_df.rename(columns={
-            col: f"{col} (Avg Critical Hours Per Day)" for col in type_cols
-        })
-        
-        
     output = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         df.to_excel(writer, sheet_name="Detailed Sensor Report", index=False)
@@ -258,7 +241,7 @@ if st.button("Generate Report!"):
             if not data.empty:
                 worksheet = writer.sheets[sheet_name]
                 for i, col in enumerate(data.columns):
-                    worksheet.set_column(i, i, 25)
+                    worksheet.set_column(i, i, 21)
     output.seek(0)
 
     prs = Presentation()
