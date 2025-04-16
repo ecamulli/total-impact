@@ -188,11 +188,12 @@ if st.button("Generate Report!"):
     df = pd.DataFrame(results)
     pivot = (
     df.groupby(['Service Area', 'Network', 'Band'])['Critical Hours Per Day']
-    .sum()
+    .mean()
     .reset_index()
     .sort_values(by="Critical Hours Per Day", ascending=False)
     )
 
+    pivot = pivot.rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per Day"})
 
     client_url = (f"https://api-v2.7signal.com/kpis/agents/locations?from={from_ts}&to={to_ts}"
                   f"&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE"
@@ -218,10 +219,10 @@ if st.button("Generate Report!"):
         summary_client_df = client_df.pivot_table(index=["Location", "Client Count"],
                                                   columns="Type",
                                                   values="Critical Hours Per Day",
-                                                  aggfunc="sum").reset_index()
+                                                  aggfunc="mean").reset_index()
         if not summary_client_df.empty:
             type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count"]]
-            summary_client_df["Total Critical Hours Per Day"] = summary_client_df[type_cols].sum(axis=1)
+            summary_client_df["Avg Critical Hours Per Day"] = summary_client_df[type_cols].sum(axis=1)
             summary_client_df = summary_client_df.sort_values(by="Total Critical Hours Per Day", ascending=False)
 
     output = BytesIO()
