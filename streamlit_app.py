@@ -193,7 +193,7 @@ if st.button("Generate Report!"):
     .sort_values(by="Critical Hours Per Day", ascending=False)
     )
     pivot.insert(1, "Days Back", days_back)
-
+    pivot["Critical Hours Per Day"] = pivot["Critical Hours Per Day"].round(2)
     pivot = pivot.rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per Day"})
 
     client_url = (f"https://api-v2.7signal.com/kpis/agents/locations?from={from_ts}&to={to_ts}"
@@ -216,18 +216,31 @@ if st.button("Generate Report!"):
         client_df = pd.DataFrame(rows)
 
     summary_client_df = pd.DataFrame()
+
     if not client_df.empty:
-        summary_client_df = client_df.pivot_table(index=["Location", "Client Count"],
-                                                  columns="Type",
-                                                  values="Critical Hours Per Day",
-                                                  aggfunc="mean").reset_index()
+        summary_client_df = client_df.pivot_table(
+            index=["Location", "Client Count"],
+            columns="Type",
+            values="Critical Hours Per Day",
+            aggfunc="mean"
+        ).reset_index()
+    
+        # Insert Days Back as second column
         summary_client_df.insert(1, "Days Back", days_back)
-
+    
         if not summary_client_df.empty:
-            type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count"]]
-            summary_client_df["Avg Critical Hours Per Day"] = summary_client_df[type_cols].sum(axis=1)
-            summary_client_df = summary_client_df.sort_values(by="Avg Critical Hours Per Day", ascending=False)
-
+            # Identify KPI type columns
+            type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count", "Days Back"]]
+    
+            # Add a total column for all averages combined
+            summary_client_df["Total Avg Critical Hours Per Day"] = summary_client_df[type_cols].sum(axis=1)
+    
+            # Round all KPI values to 2 decimal places
+            cols_to_round = [col for col in summary_client_df.columns if col not in ["Location", "Client Count"]]
+            summary_client_df[cols_to_round] = summary_client_df[cols_to_round].round(2)
+    
+            # Sort by the total avg column descending
+            summary_client_df = summary_client_df.sort_values(by="Total Avg Critical Hours Per Day", ascending=False)
     output = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         df.to_excel(writer, sheet_name="Detailed Sensor Report", index=False)
