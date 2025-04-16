@@ -192,6 +192,7 @@ if st.button("Generate Report!"):
     .reset_index()
     .sort_values(by="Critical Hours Per Day", ascending=False)
     )
+    pivot.insert(1, "Days Back", days_back)
 
     pivot = pivot.rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per Day"})
 
@@ -220,10 +221,12 @@ if st.button("Generate Report!"):
                                                   columns="Type",
                                                   values="Critical Hours Per Day",
                                                   aggfunc="mean").reset_index()
+        summary_client_df.insert(1, "Days Back", days_back)
+
         if not summary_client_df.empty:
             type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count"]]
             summary_client_df["Avg Critical Hours Per Day"] = summary_client_df[type_cols].sum(axis=1)
-            summary_client_df = summary_client_df.sort_values(by="Total Critical Hours Per Day", ascending=False)
+            summary_client_df = summary_client_df.sort_values(by="Avg Critical Hours Per Day", ascending=False)
 
     output = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
