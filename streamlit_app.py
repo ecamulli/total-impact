@@ -191,7 +191,6 @@ if st.button("Generate Report!"):
             .mean()
             .reset_index()
             .sort_values(by="Critical Hours Per Day", ascending=False)
-)
 
 pivot.insert(1, "Days Back", days_back)
 pivot["Critical Hours Per Day"] = pivot["Critical Hours Per Day"].round(2)
@@ -289,9 +288,9 @@ pivot = pivot.rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per 
         base_filename = f"{account_name}_impact_report_from_{from_str}_to_{to_str}"
 
         st.download_button("📅 Download Excel Report", data=excel_output,
-        file_name=f"{base_filename}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            file_name=f"{base_filename}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-    st.download_button("📽 Download PowerPoint Summary", data=ppt_output,
-        file_name=f"{base_filename}.pptx",
-        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+        st.download_button("📽 Download PowerPoint Summary", data=ppt_output,
+            file_name=f"{base_filename}.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
