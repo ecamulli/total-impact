@@ -187,7 +187,6 @@ if st.button("Generate Report!"):
 
     df = pd.DataFrame(results)
     pivot = (
-    pivot = (
         df.groupby(['Service Area', 'Network', 'Band'])['Critical Hours Per Day']
             .mean()
             .reset_index()
@@ -222,13 +221,13 @@ pivot = pivot.rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per 
 
     summary_client_df = pd.DataFrame()
 if not client_df.empty:
-summary_client_df = client_df.pivot_table(
-    index=["Location", "Client Count"],
-    columns="Type",
-    values="Critical Hours Per Day",
-    aggfunc="mean"
+    summary_client_df = client_df.pivot_table(
+        index=["Location", "Client Count"],
+        columns="Type",
+        values="Critical Hours Per Day",
+        aggfunc="mean"
 ).reset_index()
-
+    
 summary_client_df.insert(1, "Days Back", days_back)
 
 if not summary_client_df.empty:
