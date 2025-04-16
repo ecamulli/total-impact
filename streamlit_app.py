@@ -220,9 +220,20 @@ if st.button("Generate Report!"):
         ).reset_index()
         summary_client_df.insert(1, "Days Back", days_back)
         if not summary_client_df.empty:
-            type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count", "Days Back"]]
-            summary_client_df[type_cols] = summary_client_df[type_cols].round(2)
-            summary_client_df = summary_client_df.rename(columns={col: f"{col} (Avg)" for col in type_cols})
+            # Rename type columns to include (Avg)
+            raw_type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count", "Days Back"]]
+            rename_map = {col: f"{col} (Avg)" for col in raw_type_cols}
+            summary_client_df = summary_client_df.rename(columns=rename_map)
+        
+            # Get the new renamed columns
+            renamed_type_cols = list(rename_map.values())
+        
+            # Round the renamed columns
+            summary_client_df[renamed_type_cols] = summary_client_df[renamed_type_cols].round(2)
+        
+            # Add average column
+            summary_client_df["Avg Critical Hours Per Day"] = summary_client_df[renamed_type_cols].mean(axis=1).round(2)
+
             
             avg_col = summary_client_df[type_cols].mean(axis=1).round(2)
             summary_client_df["Avg Critical Hours Per Day"] = avg_col
