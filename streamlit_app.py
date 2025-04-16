@@ -224,23 +224,23 @@ if st.button("Generate Report!"):
             values="Critical Hours Per Day",
             aggfunc="mean"
         ).reset_index()
-    
-        # Insert Days Back as second column
-        summary_client_df.insert(1, "Days Back", days_back)
-    
-        if not summary_client_df.empty:
-            # Identify KPI type columns
-            type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count", "Days Back"]]
-    
-            # Add a total column for all averages combined
-            summary_client_df["Total Avg Critical Hours Per Day"] = summary_client_df[type_cols].sum(axis=1)
-    
-            # Round all KPI values to 2 decimal places
-            cols_to_round = [col for col in summary_client_df.columns if col not in ["Location", "Client Count"]]
-            summary_client_df[cols_to_round] = summary_client_df[cols_to_round].round(2)
-    
-            # Sort by the total avg column descending
-            summary_client_df = summary_client_df.sort_values(by="Total Avg Critical Hours Per Day", ascending=False)
+
+    # Insert Days Back as second column
+    summary_client_df.insert(1, "Days Back", days_back)
+
+    if not summary_client_df.empty:
+        # Identify just the KPI type columns
+        type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count", "Days Back"]]
+
+        # Round each KPI average to 2 decimal places
+        summary_client_df[type_cols] = summary_client_df[type_cols].round(2)
+
+        # Optional: Rename columns for clarity (if needed)
+        summary_client_df = summary_client_df.rename(columns={
+            col: f"{col} (Avg Critical Hours Per Day)" for col in type_cols
+        })
+        
+        
     output = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         df.to_excel(writer, sheet_name="Detailed Sensor Report", index=False)
@@ -258,7 +258,7 @@ if st.button("Generate Report!"):
             if not data.empty:
                 worksheet = writer.sheets[sheet_name]
                 for i, col in enumerate(data.columns):
-                    worksheet.set_column(i, i, 20)
+                    worksheet.set_column(i, i, 25)
     output.seek(0)
 
     prs = Presentation()
