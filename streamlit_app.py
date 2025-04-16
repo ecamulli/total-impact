@@ -234,6 +234,8 @@ if st.button("Generate Report!"):
             # Add average column
             summary_client_df["Avg Critical Hours Per Day"] = summary_client_df[renamed_type_cols].mean(axis=1).round(2)
 
+            # Sort by the new column (highest values first)
+            summary_client_df = summary_client_df.sort_values(by="Avg Critical Hours Per Day", ascending=False).reset_index(drop=True)
             
             
 
