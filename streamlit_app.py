@@ -223,6 +223,10 @@ if st.button("Generate Report!"):
             type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count", "Days Back"]]
             summary_client_df[type_cols] = summary_client_df[type_cols].round(2)
             summary_client_df = summary_client_df.rename(columns={col: f"{col} (Avg)" for col in type_cols})
+            
+            avg_col = summary_client_df[type_cols].mean(axis=1).round(2)
+            summary_client_df["Avg Critical Hours Per Day"] = avg_col
+
 
     excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
     ppt_output = generate_ppt_summary(pivot, summary_client_df)
