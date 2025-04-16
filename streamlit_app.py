@@ -7,6 +7,7 @@ from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pptx import Presentation
 from pptx.util import Inches, Pt
+from xlsxwriter import Workbook  # Import Workbook directly
 
 # Constants for better readability and maintainability
 API_BASE_URL = "https://api-v2.7signal.com"
@@ -26,24 +27,24 @@ MAX_DAYS_RANGE = 30
 MAX_KPI_CODES = 4
 CONCURRENT_WORKERS = 6
 
-@st.cache_data
-def _write_df_to_excel(writer, df, sheet_name):
-    """Writes a Pandas DataFrame to an Excel sheet with consistent column width."""
-    if not df.empty:
-        df.to_excel(writer, sheet_name=sheet_name, index=False)
-        worksheet = writer.sheets[sheet_name]
-        for i, col in enumerate(df.columns):
-            worksheet.set_column(i, i, EXCEL_COLUMN_WIDTH)
+def _write_df_to_excel(df_dict):
+    """
+    Writes multiple DataFrames to an Excel file in memory.  This is NOT cached.
 
-@st.cache_data
-def generate_excel_report(df, pivot, client_df, summary_client_df):
-    """Generates an Excel report with detailed and summary sheets."""
+    Args:
+        df_dict (dict): A dictionary where keys are sheet names and values are Pandas DataFrames.
+
+    Returns:
+        BytesIO: A BytesIO object containing the Excel file.
+    """
     output = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        _write_df_to_excel(writer, df, "Detailed Sensor Report")
-        _write_df_to_excel(writer, pivot, "Summary Sensor Report")
-        _write_df_to_excel(writer, client_df, "Detailed Client Report")
-        _write_df_to_excel(writer, summary_client_df, "Summary Client Report")
+        for sheet_name, df in df_dict.items():
+            if not df.empty:
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+                worksheet = writer.sheets[sheet_name]
+                for i, col in enumerate(df.columns):
+                    worksheet.set_column(i, i, EXCEL_COLUMN_WIDTH)
     output.seek(0)
     return output
 
@@ -87,6 +88,20 @@ def generate_ppt_summary(pivot, summary_client_df):
     prs.save(ppt_output)
     ppt_output.seek(0)
     return ppt_output
+
+@st.cache_data
+def generate_excel_report(df, pivot, client_df, summary_client_df):
+    """
+    Prepares the data for Excel report generation in a non-cached function.
+    This function is cached because its *input* is hashable data.
+    """
+    df_dict = {
+        "Detailed Sensor Report": df,
+        "Summary Sensor Report": pivot,
+        "Detailed Client Report": client_df,
+        "Summary Client Report": summary_client_df,
+    }
+    return df_dict
 
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
 st.title("📊 7SIGNAL Total Impact Report")
@@ -247,60 +262,62 @@ if st.button("Generate Report!"):
 
     if not results:
         st.warning("No sensor KPI data found for the selected criteria.")
-    else:
-        df = pd.DataFrame(results)
-        pivot = (
-            df.groupby(['Service Area', 'Network', 'Band'])['Critical Hours Per Day']
-            .mean()
-            .reset_index()
-            .sort_values(by="Critical Hours Per Day", ascending=False)
-        )
-        pivot.insert(1, "Days Back", days_back)
-        pivot["Avg Critical Hours Per Day"] = pivot["Critical Hours Per Day"].round(2)
-        pivot.drop(columns=["Critical Hours Per Day"], inplace=True)
+        st.stop()
 
-        with st.spinner("Fetching client KPI data..."):
-            client_url = f"{AGENTS_KPI_URL}?from={from_ts}&to={to_ts}&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE&band=5&includeClientCount=true"
-            client_results = safe_get(client_url, headers)
-            client_df = pd.DataFrame()
-            if client_results:
-                rows = []
-                for loc in client_results:
-                    for t in loc.get("types", []):
-                        rows.append({
-                            "Location": loc.get("locationName"), "Client Count": loc.get("clientCount"),
-                            "Days Back": days_back,
-                            "Type": t.get("type").replace("_", " ").title(),
-                            "Critical Sum": t.get("criticalSum"),
-                            "Critical Hours Per Day": round(min((t.get("criticalSum", 0) or 0) / 60 / days_back, 24), 2)
-                        })
-                client_df = pd.DataFrame(rows)
+    df = pd.DataFrame(results)
+    pivot = (
+        df.groupby(['Service Area', 'Network', 'Band'])['Critical Hours Per Day']
+        .mean()
+        .reset_index()
+        .sort_values(by="Critical Hours Per Day", ascending=False)
+    )
+    pivot.insert(1, "Days Back", days_back)
+    pivot["Avg Critical Hours Per Day"] = pivot["Critical Hours Per Day"].round(2)
+    pivot.drop(columns=["Critical Hours Per Day"], inplace=True)
 
-        summary_client_df = pd.DataFrame()
-        if not client_df.empty:
-            summary_client_df = client_df.pivot_table(
-                index=["Location", "Client Count"],
-                columns="Type",
-                values="Critical Hours Per Day",
-                aggfunc="mean"
-            ).reset_index()
-            summary_client_df.insert(1, "Days Back", days_back)
-            type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count", "Days Back"]]
-            summary_client_df[type_cols] = summary_client_df[type_cols].round(2)
-            summary_client_df = summary_client_df.rename(columns={col: f"{col} (Avg)" for col in type_cols})
+    with st.spinner("Fetching client KPI data..."):
+        client_url = f"{AGENTS_KPI_URL}?from={from_ts}&to={to_ts}&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE&band=5&includeClientCount=true"
+        client_results = safe_get(client_url, headers)
+        client_df = pd.DataFrame()
+        if client_results:
+            rows = []
+            for loc in client_results:
+                for t in loc.get("types", []):
+                    rows.append({
+                        "Location": loc.get("locationName"), "Client Count": loc.get("clientCount"),
+                        "Days Back": days_back,
+                        "Type": t.get("type").replace("_", " ").title(),
+                        "Critical Sum": t.get("criticalSum"),
+                        "Critical Hours Per Day": round(min((t.get("criticalSum", 0) or 0) / 60 / days_back, 24), 2)
+                    })
+            client_df = pd.DataFrame(rows)
 
-        with st.spinner("Generating reports..."):
-            excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
-            ppt_output = generate_ppt_summary(pivot, summary_client_df)
+    summary_client_df = pd.DataFrame()
+    if not client_df.empty:
+        summary_client_df = client_df.pivot_table(
+            index=["Location", "Client Count"],
+            columns="Type",
+            values="Critical Hours Per Day",
+            aggfunc="mean"
+        ).reset_index()
+        summary_client_df.insert(1, "Days Back", days_back)
+        type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count", "Days Back"]]
+        summary_client_df[type_cols] = summary_client_df[type_cols].round(2)
+        summary_client_df = summary_client_df.rename(columns={col: f"{col} (Avg)" for col in type_cols})
 
-        from_str = from_datetime.strftime("%Y-%m-%d")
-        to_str = to_datetime.strftime("%Y-%m-%d")
-        base_filename = f"{account_name}_impact_report_from_{from_str}_to_{to_str}"
+    with st.spinner("Generating reports..."):
+        excel_data_dict = generate_excel_report(df, pivot, client_df, summary_client_df)
+        excel_output = _write_df_to_excel(excel_data_dict)
+        ppt_output = generate_ppt_summary(pivot, summary_client_df)
 
-        st.download_button("📅 Download Excel Report", data=excel_output,
-                            file_name=f"{base_filename}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    from_str = from_datetime.strftime("%Y-%m-%d")
+    to_str = to_datetime.strftime("%Y-%m-%d")
+    base_filename = f"{account_name}_impact_report_from_{from_str}_to_{to_str}"
 
-        st.download_button("📽 Download PowerPoint Summary", data=ppt_output,
-                            file_name=f"{base_filename}.pptx",
-                            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+    st.download_button("📅 Download Excel Report", data=excel_output,
+                        file_name=f"{base_filename}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+    st.download_button("📽 Download PowerPoint Summary", data=ppt_output,
+                        file_name=f"{base_filename}.pptx",
+                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
