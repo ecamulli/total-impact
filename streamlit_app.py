@@ -192,16 +192,13 @@ if st.button("Generate Report!"):
             .mean()
             .reset_index()
             .sort_values(by="Critical Hours Per Day", ascending=False)
-    )
 
 pivot.insert(1, "Days Back", days_back)
 pivot["Critical Hours Per Day"] = pivot["Critical Hours Per Day"].round(2)
 pivot = pivot.rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per Day"})
-    )
 pivot.insert(1, "Days Back", days_back)
 pivot["Critical Hours Per Day"] = pivot["Critical Hours Per Day"].round(2)
 pivot = pivot.rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per Day"})
-    )
 
 
     client_url = (f"https://api-v2.7signal.com/kpis/agents/locations?from={from_ts}&to={to_ts}"
