@@ -63,11 +63,13 @@ def generate_excel_report(df, pivot, client_df, summary_client_df):
 def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_str):
     prs = Presentation("Template Impact Report - April 2025.pptx")
 
+    # Title slide (layout 0)
     title_slide = prs.slides.add_slide(prs.slide_layouts[0])
     title_slide.placeholders[10].text = f"{account_name} Impact Report"
     title_slide.placeholders[11].text = f"{from_str} to {to_str}"
 
     def add_table_slide(df, title):
+        # Content slide (layout 2)
         slide = prs.slides.add_slide(prs.slide_layouts[2])
         slide.placeholders[10].text = title
         tbl = slide.shapes.add_table(
@@ -76,8 +78,10 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
             left=Inches(0.5), top=Inches(1.5),
             width=Inches(9), height=Inches(0.3 * df.shape[0])
         ).table
+        # header row
         for c, col_name in enumerate(df.columns):
             tbl.cell(0, c).text = str(col_name)
+        # data rows
         for r, row in enumerate(df.values, start=1):
             for c, val in enumerate(row):
                 cell = tbl.cell(r, c)
@@ -88,10 +92,10 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
     if not summary_client_df.empty:
         add_table_slide(summary_client_df.head(10), "👥 Summary Client Report")
 
-    output = BytesIO()
-    prs.save(output)
-    output.seek(0)
-    return output
+    ppt_output = BytesIO()
+    prs.save(ppt_output)
+    ppt_output.seek(0)
+    return ppt_output
 
 # Main App
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
@@ -103,14 +107,15 @@ client_id       = st.text_input("Client ID")
 client_secret   = st.text_input("Client Secret", type="password")
 kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
 
+# Time range
 st.markdown("### ⏱️ Select Date and Time Range (Eastern Time - ET)")
-eastern        = pytz.timezone("US/Eastern")
-now_et         = datetime.now(eastern)
-default_start  = now_et - timedelta(days=7)
-from_date      = st.date_input("From Date",  value=default_start.date())
-from_time      = st.time_input("From Time",  value=default_start.time())
-to_date        = st.date_input("To Date",    value=now_et.date())
-to_time        = st.time_input("To Time",    value=now_et.time())
+eastern       = pytz.timezone("US/Eastern")
+now_et        = datetime.now(eastern)
+default_start = now_et - timedelta(days=7)
+from_date     = st.date_input("From Date",  value=default_start.date())
+from_time     = st.time_input("From Time",  value=default_start.time())
+to_date       = st.date_input("To Date",    value=now_et.date())
+to_time       = st.time_input("To Time",    value=now_et.time())
 
 from_datetime = eastern.localize(datetime.combine(from_date, from_time))
 to_datetime   = eastern.localize(datetime.combine(to_date,   to_time))
@@ -127,12 +132,10 @@ if days_back > 30:
     st.error("Range cannot exceed 30 days.")
     st.stop()
 
+# Show selected days
 st.markdown(f"🗓 Selected Range: **{days_back} days**")
 from_ts = int(from_datetime.timestamp() * 1000)
 to_ts   = int(to_datetime.timestamp()   * 1000)
-
-# Show selected date range in days
-st.markdown(f"🗓 Selected Range: **{days_back} days**")
 
 # API Helpers
 def authenticate(cid, secret):
@@ -212,7 +215,6 @@ if st.button("Generate Report!"):
     networks      = get_networks(headers)
     kpi_codes     = [k.strip() for k in kpi_codes_input.split(",")][:4]
 
-    # Fetch sensor KPI data in parallel
     results = []
     with ThreadPoolExecutor(max_workers=6) as ex:
         futures = [ex.submit(get_kpi_data, headers, sa, net, code, from_ts, to_ts, days_back)
@@ -226,8 +228,8 @@ if st.button("Generate Report!"):
 
     df = pd.DataFrame(results)
     pivot = (
-        df.groupby(["Service Area","Network","Band"])  
-          .mean()[['Critical Hours Per Day']]  
+        df.groupby(["Service Area", "Network", "Band"])['Critical Hours Per Day']
+          .mean()
           .reset_index()
           .sort_values(by="Critical Hours Per Day", ascending=False)
     )
@@ -235,7 +237,6 @@ if st.button("Generate Report!"):
     pivot["Critical Hours Per Day"] = pivot["Critical Hours Per Day"].round(2)
     pivot = pivot.rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per Day"})
 
-    # Client data
     client_url = (
         f"https://api-v2.7signal.com/kpis/agents/locations?from={from_ts}&to={to_ts}&includeClientCount=true"
     )
@@ -253,7 +254,6 @@ if st.button("Generate Report!"):
                 })
     client_df = pd.DataFrame(rows)
 
-    # Summary client pivot
     summary_client_df = pd.DataFrame()
     if not client_df.empty:
         summary_client_df = client_df.pivot_table(
@@ -264,17 +264,13 @@ if st.button("Generate Report!"):
         type_cols = [c for c in summary_client_df.columns if c not in ['Location','Client Count','Days Back']]
         summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
         summary_client_df['Avg Critical Hours Per Day'] = summary_client_df[type_cols].mean(axis=1).round(2)
-        summary_client_df = summary_client_df.sort_values(by='Avg Critical Hours Per Day',ascending=False).reset_index(drop=True)
 
-    # Format date strings
+    # Finally, download buttons
+    excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
     from_str = from_datetime.strftime('%Y-%m-%d')
     to_str   = to_datetime.strftime('%Y-%m-%d')
+    ppt_output = generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_str)
 
-    # Generate files
-    excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
-    ppt_output   = generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_str)
-
-    # Download buttons
     st.download_button(
         "🗕 Download Excel Report",
         data=excel_output,
