@@ -95,9 +95,18 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
         tbl = slide.shapes.add_table(
             rows=df.shape[0] + 1,
             cols=df.shape[1],
-            left=Inches(0.5), top=Inches(1.5),
-            width=Inches(9), height=Inches(0.3 * df.shape[0])
-        ).table
+            slide_width = prs.slide_width
+            table_width = Inches(10.5)
+            left_margin = (slide_width - table_width) / 2
+            
+            tbl = slide.shapes.add_table(
+                rows=df.shape[0] + 1,
+                cols=df.shape[1],
+                left=left_margin,
+                top=Inches(1.5),
+                width=table_width,
+                height=Inches(0.3 * df.shape[0])
+            ).table
     
         # Header
         for c, col_name in enumerate(df.columns):
@@ -134,9 +143,20 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
         }
     
         # Add totals for each KPI column
+        total_row = {
+            "Location": "Total",
+            "Days Back": "",
+            "Client Count": ""  # Optional: you could sum client count too if you want
+        }
+        
+        # Only total the final column: Avg Critical Hours Per Day
+        if "Avg Critical Hours Per Day" in client_summary_with_total.columns:
+            total_row["Avg Critical Hours Per Day"] = client_summary_with_total["Avg Critical Hours Per Day"].sum()
+        
+        # Add empty values for other columns to preserve structure
         for col in client_summary_with_total.columns:
-            if col not in ["Location", "Days Back", "Client Count"]:
-                total_row[col] = client_summary_with_total[col].sum()
+            if col not in total_row:
+                total_row[col] = ""
     
         # Append total row to the DataFrame
         client_summary_with_total = pd.concat(
