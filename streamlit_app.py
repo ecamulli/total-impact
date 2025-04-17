@@ -349,7 +349,7 @@ if st.button("Generate Report!"):
     excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
     from_str = from_datetime.strftime('%Y-%m-%d')
     to_str   = to_datetime.strftime('%Y-%m-%d')
-    # ppt_output = generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_str)
+    ppt_output = generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_str)
 
     st.download_button(
         "Download Excel Report",
