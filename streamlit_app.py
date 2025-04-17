@@ -69,27 +69,30 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
     title_slide.placeholders[1].text = f"{from_str} to {to_str}"
 
     def add_table_slide(df, title):
-        # Content slide (layout 2)
         slide = prs.slides.add_slide(prs.slide_layouts[2])
-        for ph in slide.placeholders:
-            if ph.placeholder_format.idx == 0:
-                ph.text = title
-                break
+    
+        # Safely try to find a title placeholder (usually type == TITLE == 1)
+        title_placeholder = next((ph for ph in slide.placeholders if ph.placeholder_format.type == 1), None)
+        if title_placeholder:
+            title_placeholder.text = title
+    
+        # Create table
         tbl = slide.shapes.add_table(
             rows=df.shape[0] + 1,
             cols=df.shape[1],
             left=Inches(0.5), top=Inches(1.5),
             width=Inches(9), height=Inches(0.3 * df.shape[0])
         ).table
-        # header row
+    
         for c, col_name in enumerate(df.columns):
             tbl.cell(0, c).text = str(col_name)
-        # data rows
+    
         for r, row in enumerate(df.values, start=1):
             for c, val in enumerate(row):
                 cell = tbl.cell(r, c)
                 cell.text = str(val)
                 cell.text_frame.paragraphs[0].font.size = Pt(10)
+
 
     add_table_slide(pivot.head(10), "📊 Summary Sensor Report")
     if not summary_client_df.empty:
