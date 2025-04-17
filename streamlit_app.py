@@ -65,11 +65,12 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
     # 1) Load the user’s template
     prs = Presentation("Template Impact Report.pptx")  
 
-    # 2) Title slide (layout 0)
+    # 2) Title slide (layout 0) — use the actual placeholder idxs from your template
     title_slide = prs.slides.add_slide(prs.slide_layouts[0])
-    # placeholder 0 is the main title, placeholder 1 is the subtitle
-    title_slide.placeholders[0].text = f"{account_name} Impact Report"
-    title_slide.placeholders[1].text = f"{from_str} to {to_str}"
+    # your template uses ph_idx 10 for the main title, 11 for subtitle
+    title_slide.placeholders[10].text = f"{account_name} Impact Report"
+    title_slide.placeholders[11].text = f"{from_str} to {to_str}"
+
 
     # 3) Helper to add a table slide using layout 2
     def add_table_slide(df, title):
