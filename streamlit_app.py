@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pytz
 from pptx import Presentation
 from pptx.util import Inches, Pt
+from pptx.dml.color import RGBColor
 
 @st.cache_data
 def generate_excel_report(df, pivot, client_df, summary_client_df):
@@ -61,36 +62,108 @@ def generate_excel_report(df, pivot, client_df, summary_client_df):
 
 @st.cache_data
 def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_str):
-    prs = Presentation("Template Impact Report.pptx")
+    prs = Presentation("New Impact Report Template.pptx")
 
     # Title slide (layout 0)
     title_slide = prs.slides.add_slide(prs.slide_layouts[0])
-    title_slide.placeholders[10].text = f"{account_name} Impact Report"
-    title_slide.placeholders[11].text = f"{from_str} to {to_str}"
+    title_slide.placeholders[0].text = f"Impact Report for {account_name}"
+    title_slide.placeholders[1].text = f"{from_str} to {to_str}"
 
+    # Create a copy of the pivot to append the total row for PowerPoint
+    pivot_with_total = pivot.copy()
+    
+    # Add a Total row
+    total_row = {
+        "Service Area": "Total",
+        "Days Back": "",  # You could also set this to the actual value if you prefer
+        "Network": "",
+        "Band": "",
+        "Avg Critical Hours Per Day": pivot["Avg Critical Hours Per Day"].sum()
+    }
+    pivot_with_total = pd.concat([pivot_with_total, pd.DataFrame([total_row])], ignore_index=True)
+
+    
     def add_table_slide(df, title):
-        # Content slide (layout 2)
         slide = prs.slides.add_slide(prs.slide_layouts[2])
-        slide.placeholders[10].text = title
+    
+        # Safely set slide title
+        title_placeholder = next((ph for ph in slide.placeholders if ph.placeholder_format.type == 1), None)
+        if title_placeholder:
+            title_placeholder.text = title
+    
+        # Calculate centering position
+        slide_width = prs.slide_width
+        table_width = Inches(10.5)
+        left_margin = (slide_width - table_width) / 2
+        
+        # Create centered table
         tbl = slide.shapes.add_table(
             rows=df.shape[0] + 1,
             cols=df.shape[1],
-            left=Inches(0.5), top=Inches(1.5),
-            width=Inches(9), height=Inches(0.3 * df.shape[0])
+            left=left_margin,
+            top=Inches(1.5),
+            width=table_width,
+            height=Inches(0.3 * df.shape[0])
         ).table
-        # header row
+    
+        # Header
         for c, col_name in enumerate(df.columns):
             tbl.cell(0, c).text = str(col_name)
-        # data rows
+    
+        # Rows
         for r, row in enumerate(df.values, start=1):
+            is_total_row = str(row[0]).strip().lower() == "total"
             for c, val in enumerate(row):
                 cell = tbl.cell(r, c)
-                cell.text = str(val)
-                cell.text_frame.paragraphs[0].font.size = Pt(10)
+                try:
+                    cell.text = "" if pd.isna(val) else str(val)
+                except Exception:
+                    cell.text = "?"
+                para = cell.text_frame.paragraphs[0]
+                para.font.size = Pt(10)
+    
+                # Highlight the "Total" row
+            if is_total_row:
+                para.font.bold = True
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = RGBColor(255, 230, 153)  # light yellow
 
-    add_table_slide(pivot.head(10), "📊 Summary Sensor Report")
+    add_table_slide(pivot_with_total, "Summary Sensor Report")
+
     if not summary_client_df.empty:
-        add_table_slide(summary_client_df.head(10), "👥 Summary Client Report")
+        client_summary_with_total = summary_client_df.copy()
+
+        # Compute total row
+        total_row = {
+            "Location": "Total",
+            "Days Back": "",
+            "Client Count": client_summary_with_total["Client Count"].sum()
+        }
+    
+        # Add totals for each KPI column
+        total_row = {
+            "Location": "Total",
+            "Days Back": "",
+            "Client Count": ""  # Optional: you could sum client count too if you want
+        }
+        
+        # Only total the final column: Avg Critical Hours Per Day
+        if "Avg Critical Hours Per Day" in client_summary_with_total.columns:
+            total_row["Avg Critical Hours Per Day"] = client_summary_with_total["Avg Critical Hours Per Day"].sum()
+        
+        # Add empty values for other columns to preserve structure
+        for col in client_summary_with_total.columns:
+            if col not in total_row:
+                total_row[col] = ""
+    
+        # Append total row to the DataFrame
+        client_summary_with_total = pd.concat(
+            [client_summary_with_total, pd.DataFrame([total_row])],
+            ignore_index=True
+        )
+    
+        # Send to slide (use full, not .head(10), since Total might be at the end)
+        add_table_slide(client_summary_with_total, "Summary Client Report")
 
     ppt_output = BytesIO()
     prs.save(ppt_output)
@@ -238,8 +311,15 @@ if st.button("Generate Report!"):
     pivot = pivot.rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per Day"})
 
     client_url = (
-        f"https://api-v2.7signal.com/kpis/agents/locations?from={from_ts}&to={to_ts}&includeClientCount=true"
+        f"https://api-v2.7signal.com/kpis/agents/locations"
+        f"?from={from_ts}&to={to_ts}"
+        f"&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE"
+        f"&type=CO_CHANNEL_INTERFERENCE&type=RF_PROBLEM"
+        f"&type=CONGESTION&type=COVERAGE"
+        f"&includeClientCount=true"
     )
+
+    
     r = safe_get(client_url, headers)
     rows = []
     if r:
