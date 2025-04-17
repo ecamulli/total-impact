@@ -86,3 +86,15 @@ if days_back > 30:
 st.markdown(f"🗓 Selected Range: **{days_back} days**")
 from_ts = int(from_datetime.timestamp() * 1000)
 to_ts = int(to_datetime.timestamp() * 1000)
+
+# Generate Report Button
+if st.button("Generate Report!"):
+    st.success("✅ This is where you'd generate the Excel report.")
+    # Placeholder: replace with actual data and function calls
+    # excel_output = generate_excel_report(...)
+    # st.download_button(
+    #     "🗕 Download Excel Report",
+    #     data=excel_output,
+    #     file_name=f"{account_name}_impact_report.xlsx",
+    #     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    # )
