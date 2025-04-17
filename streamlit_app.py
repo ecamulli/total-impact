@@ -8,7 +8,9 @@ import pytz
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
 
+@st.cache_data
 @st.cache_data
 def generate_excel_report(df, pivot, client_df, summary_client_df):
     output = BytesIO()
@@ -31,14 +33,14 @@ def generate_excel_report(df, pivot, client_df, summary_client_df):
         if not client_df.empty:
             client_df.to_excel(writer, sheet_name="Detailed Client Report", index=False)
 
-        # Summary Client Report + Total
+        # Summary Client Report + Total (only one column summed!)
         if not summary_client_df.empty:
             summary_client_df.to_excel(writer, sheet_name="Summary Client Report", index=False)
             ws2 = writer.sheets["Summary Client Report"]
             total_row_2 = len(summary_client_df) + 1
-            ws2.write(total_row_2, 0, "Total")
             avg_idx = summary_client_df.columns.get_loc("Avg Critical Hours Per Day")
             col_letter = chr(ord('A') + avg_idx)
+            ws2.write(total_row_2, 0, "Total")
             ws2.write_formula(
                 total_row_2, avg_idx,
                 f"=SUM({col_letter}2:{col_letter}{total_row_2})",
@@ -95,7 +97,7 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
         slide_width = prs.slide_width
         table_width = Inches(10.5)
         left_margin = (slide_width - table_width) / 2
-        
+    
         # Create centered table
         tbl = slide.shapes.add_table(
             rows=df.shape[0] + 1,
@@ -108,7 +110,11 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
     
         # Header
         for c, col_name in enumerate(df.columns):
-            tbl.cell(0, c).text = str(col_name)
+            cell = tbl.cell(0, c)
+            cell.text = str(col_name)
+            para = cell.text_frame.paragraphs[0]
+            para.font.bold = True
+            para.alignment = PP_ALIGN.CENTER
     
         # Rows
         for r, row in enumerate(df.values, start=1):
@@ -121,13 +127,13 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
                     cell.text = "?"
                 para = cell.text_frame.paragraphs[0]
                 para.font.size = Pt(10)
+                para.alignment = PP_ALIGN.CENTER
     
-                # Highlight the "Total" row
-            if is_total_row:
-                para.font.bold = True
-                cell.fill.solid()
-                cell.fill.fore_color.rgb = RGBColor(255, 230, 153)  # light yellow
-
+                if is_total_row:
+                    para.font.bold = True
+                    cell.fill.solid()
+                    cell.fill.fore_color.rgb = RGBColor(255, 230, 153)  # light yellow
+    
     add_table_slide(pivot_with_total, "Summary Sensor Report")
 
     if not summary_client_df.empty:
