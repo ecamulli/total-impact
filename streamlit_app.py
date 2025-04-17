@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pytz
 from pptx import Presentation
 from pptx.util import Inches, Pt
+from pptx.dml.color import RGBColor
 
 @st.cache_data
 def generate_excel_report(df, pivot, client_df, summary_client_df):
@@ -114,14 +115,13 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
                 para = cell.text_frame.paragraphs[0]
                 para.font.size = Pt(10)
     
-                # 💡 Highlight the "Total" row
+                # Highlight the "Total" row
                 if is_total_row:
                     para.font.bold = True
                     cell.fill.solid()
                     cell.fill.fore_color.rgb = RGBColor(255, 230, 153)  # light yellow
 
-
-    add_table_slide(pivot_with_total, "Summary Sensor Report")
+add_table_slide(pivot_with_total, "Summary Sensor Report")
 
     if not summary_client_df.empty:
         client_summary_with_total = summary_client_df.copy()
