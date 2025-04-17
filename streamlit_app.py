@@ -213,7 +213,7 @@ if st.button("Generate Report!"):
         summary_client_df = client_df.pivot_table(
             index=['Location', 'Client Count'], columns='Type',
             values='Critical Hours Per Day', aggfunc='mean'
-        ).reset_index()
+        ).reset_index().sort_values(by="Avg Critical Hours Per Day", ascending=False)
         summary_client_df.insert(1, 'Days Back', round(days_back, 2))
         type_cols = [c for c in summary_client_df.columns if c not in ['Location', 'Client Count', 'Days Back']]
         summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
