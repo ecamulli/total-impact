@@ -357,9 +357,9 @@ if st.button("Generate Report!"):
         file_name=f"{account_name}_impact_report_{from_str}_to_{to_str}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    st.download_button(
-        "🎮 Download PowerPoint Summary",
-        data=ppt_output,
-        file_name=f"{account_name}_impact_report_{from_str}_to_{to_str}.pptx",
-        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-    )
+    #st.download_button(
+    #    "🎮 Download PowerPoint Summary",
+    #    data=ppt_output,
+    #    file_name=f"{account_name}_impact_report_{from_str}_to_{to_str}.pptx",
+    #    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    #)
