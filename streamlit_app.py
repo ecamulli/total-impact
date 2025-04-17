@@ -213,11 +213,12 @@ if st.button("Generate Report!"):
         summary_client_df = client_df.pivot_table(
             index=['Location', 'Client Count'], columns='Type',
             values='Critical Hours Per Day', aggfunc='mean'
-        ).reset_index().sort_values(by="Avg Critical Hours Per Day", ascending=False)
+        ).reset_index()
         summary_client_df.insert(1, 'Days Back', round(days_back, 2))
         type_cols = [c for c in summary_client_df.columns if c not in ['Location', 'Client Count', 'Days Back']]
         summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
         summary_client_df['Avg Critical Hours Per Day'] = summary_client_df[type_cols].mean(axis=1).round(2)
+        summary_client_df = summary_client_df.sort_values(by='Avg Critical Hours Per Day', ascending=False)
 
     excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
 
