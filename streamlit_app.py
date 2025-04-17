@@ -226,7 +226,7 @@ if st.button("Generate Report!"):
     to_str = to_datetime.strftime('%Y-%m-%d')
 
     st.download_button(
-        "\U0001F4C4 Download Excel Report",
+        "Download Excel Report",
         data=excel_output,
         file_name=f"{account_name}_impact_report_{from_str}_to_{to_str}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
