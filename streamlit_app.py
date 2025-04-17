@@ -249,10 +249,14 @@ if st.button("Generate Report!"):
     pivot = pivot.rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per Day"})
 
     client_url = (
-        f"https://api-v2.7signal.com/kpis/agents/locations?from={from_ts}&to={to_ts}
-        &type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE&type=RF_PROBLEM&type=CONGESTION
-        &type=COVERAGE&includeClientCount=true"
+        f"https://api-v2.7signal.com/kpis/agents/locations"
+        f"?from={from_ts}&to={to_ts}"
+        f"&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE"
+        f"&type=CO_CHANNEL_INTERFERENCE&type=RF_PROBLEM"
+        f"&type=CONGESTION&type=COVERAGE"
+        f"&includeClientCount=true"
     )
+
     
     r = safe_get(client_url, headers)
     rows = []
