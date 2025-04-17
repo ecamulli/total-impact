@@ -159,28 +159,28 @@ if st.button("Generate Report!"):
     if not all([account_name, client_id, client_secret, kpi_codes_input]):
         st.warning("All fields are required.")
         st.stop()
-
+    
     token = authenticate(client_id, client_secret)
     if not token:
         st.error("❌ Authentication failed")
         st.stop()
-
+    
     headers = {"Authorization": f"Bearer {token}"}
     service_areas = get_service_areas(headers)
     networks = get_networks(headers)
     kpi_codes = [k.strip() for k in kpi_codes_input.split(',')][:4]
-
+    
     results = []
     with ThreadPoolExecutor(max_workers=6) as ex:
         futures = [ex.submit(get_kpi_data, headers, sa, net, code, from_ts, to_ts, days_back)
                    for sa in service_areas for net in networks for code in kpi_codes]
         for f in as_completed(futures):
             results.extend(f.result())
-
+    
     if not results:
         st.warning("No results found.")
         st.stop()
-
+    
     df = pd.DataFrame(results)
     pivot = (
         df.groupby(['Service Area', 'Network', 'Band'])['Critical Hours Per Day']
@@ -191,7 +191,7 @@ if st.button("Generate Report!"):
     pivot.insert(1, "Days Back", days_back)
     pivot["Critical Hours Per Day"] = pivot["Critical Hours Per Day"].round(2)
     pivot = pivot.rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per Day"})
-
+    
     client_url = (f"https://api-v2.7signal.com/kpis/agents/locations?from={from_ts}&to={to_ts}"
                   f"&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE"
                   f"&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE&band=5&includeClientCount=true")
@@ -209,8 +209,8 @@ if st.button("Generate Report!"):
                     "Critical Hours Per Day": round(min((t.get("criticalSum", 0) or 0) / 60 / days_back, 24), 2)
                 })
         client_df = pd.DataFrame(rows)
-
-    summary_client_df = pd.DataFrame()
+    
+        summary_client_df = pd.DataFrame()
         if not client_df.empty:
             summary_client_df = client_df.pivot_table(
                 index=["Location", "Client Count"],
@@ -219,18 +219,21 @@ if st.button("Generate Report!"):
                 aggfunc="mean"
             ).reset_index()
             summary_client_df.insert(1, "Days Back", days_back)
-            if not summary_client_df.empty:
-                        
-                type_cols = [col for col in summary_client_df.columns if col not in ["Location", "Client Count", "Days Back"]]
+            
+            if not summary_client_df.empty:     
+                type_cols = [
+                    col for col in summary_client_df.columns 
+                    if col not in ["Location", "Client Count", "Days Back"]
+                ]
                 summary_client_df[type_cols] = summary_client_df[type_cols].round(2)
                 summary_client_df["Avg Critical Hours Per Day"] = summary_client_df[type_cols].mean(axis=1).round(2)
                 summary_client_df[type_cols] = summary_client_df[type_cols].fillna(0)
-    
+        
                 # Sort by the new column (highest values first)
                 summary_client_df = summary_client_df.sort_values(by="Avg Critical Hours Per Day", ascending=False).reset_index(drop=True)
-                
-            
-
+                    
+         
+    
     excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
     ppt_output = generate_ppt_summary(pivot, summary_client_df)
 
