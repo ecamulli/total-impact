@@ -89,12 +89,16 @@ to_ts = int(to_datetime.timestamp() * 1000)
 
 # Generate Report Button
 if st.button("Generate Report!"):
-    st.success("✅ This is where you'd generate the Excel report.")
-    # Placeholder: replace with actual data and function calls
-    # excel_output = generate_excel_report(...)
-    # st.download_button(
-    #     "🗕 Download Excel Report",
-    #     data=excel_output,
-    #     file_name=f"{account_name}_impact_report.xlsx",
-    #     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    # )
+    df = pd.DataFrame({"Example": [1, 2, 3]})
+    pivot = df.copy()
+    client_df = df.copy()
+    summary_client_df = df.copy()
+
+    excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
+
+    st.download_button(
+        "🗕 Download Excel Report",
+        data=excel_output,
+        file_name=f"{account_name}_impact_report.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
