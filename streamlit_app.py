@@ -71,7 +71,10 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
     def add_table_slide(df, title):
         # Content slide (layout 2)
         slide = prs.slides.add_slide(prs.slide_layouts[2])
-        slide.placeholders[10].text = title
+        for ph in slide.placeholders:
+            if ph.placeholder_format.idx == 0:
+                ph.text = title
+                break
         tbl = slide.shapes.add_table(
             rows=df.shape[0] + 1,
             cols=df.shape[1],
