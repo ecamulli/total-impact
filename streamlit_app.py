@@ -15,6 +15,17 @@ def generate_excel_report(df, pivot, client_df, summary_client_df):
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         df.to_excel(writer, sheet_name="Detailed Sensor Report", index=False)
         pivot.to_excel(writer, sheet_name="Summary Sensor Report", index=False)
+        # now append a total row in column “Avg Critical Hours Per Day”
+        ws1 = writer.sheets["Summary Sensor Report"]
+        total_row_1 = len(pivot) + 1  # 0‑based: header is row 0, data runs 1…len(pivot)
+        # write “Total” label in col A
+        ws1.write(total_row_1, 0, "Total")
+        # sum E2:E{last} — column E is the 5th column (0‑based index 4)
+        ws1.write_formula(
+            total_row_1, 4,
+            f"=SUM(E2:E{total_row_1})",
+            writer.book.add_format({"num_format":"0.00"})
+        )
         if not client_df.empty:
             client_df.to_excel(writer, sheet_name="Detailed Client Report", index=False)
         if not summary_client_df.empty:
