@@ -71,7 +71,7 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
     def add_table_slide(df, title):
         slide = prs.slides.add_slide(prs.slide_layouts[2])
     
-        # Safely try to find a title placeholder (usually type == TITLE == 1)
+        # Safely set slide title
         title_placeholder = next((ph for ph in slide.placeholders if ph.placeholder_format.type == 1), None)
         if title_placeholder:
             title_placeholder.text = title
@@ -84,13 +84,18 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
             width=Inches(9), height=Inches(0.3 * df.shape[0])
         ).table
     
+        # Header
         for c, col_name in enumerate(df.columns):
             tbl.cell(0, c).text = str(col_name)
     
+        # Rows
         for r, row in enumerate(df.values, start=1):
             for c, val in enumerate(row):
                 cell = tbl.cell(r, c)
-                cell.text = str(val)
+                try:
+                    cell.text = "" if pd.isna(val) else str(val)
+                except Exception:
+                    cell.text = "?"
                 cell.text_frame.paragraphs[0].font.size = Pt(10)
 
 
