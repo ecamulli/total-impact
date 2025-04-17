@@ -10,14 +10,57 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 
+
+def add_table_slide(prs, df, title):
+    slide = prs.slides.add_slide(prs.slide_layouts[2])
+
+    title_placeholder = next((ph for ph in slide.placeholders if ph.placeholder_format.type == 1), None)
+    if title_placeholder:
+        title_placeholder.text = title
+
+    slide_width = prs.slide_width
+    table_width = Inches(10.5)
+    left_margin = (slide_width - table_width) / 2
+
+    tbl = slide.shapes.add_table(
+        rows=df.shape[0] + 1,
+        cols=df.shape[1],
+        left=left_margin,
+        top=Inches(1.5),
+        width=table_width,
+        height=Inches(0.3 * df.shape[0])
+    ).table
+
+    for c, col_name in enumerate(df.columns):
+        cell = tbl.cell(0, c)
+        cell.text = str(col_name)
+        para = cell.text_frame.paragraphs[0]
+        para.font.bold = True
+        para.alignment = PP_ALIGN.CENTER
+
+    for r, row in enumerate(df.values, start=1):
+        is_total_row = str(row[0]).strip().lower() == "total"
+        for c, val in enumerate(row):
+            cell = tbl.cell(r, c)
+            try:
+                cell.text = "" if pd.isna(val) else str(val)
+            except Exception:
+                cell.text = "?"
+            para = cell.text_frame.paragraphs[0]
+            para.font.size = Pt(10)
+            para.alignment = PP_ALIGN.CENTER
+
+            if is_total_row:
+                para.font.bold = True
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = RGBColor(255, 230, 153)
+
+
 @st.cache_data
 def generate_excel_report(df, pivot, client_df, summary_client_df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        # Detailed Sensor Report
         df.to_excel(writer, sheet_name="Detailed Sensor Report", index=False)
-
-        # Summary Sensor Report + Total
         pivot.to_excel(writer, sheet_name="Summary Sensor Report", index=False)
         ws1 = writer.sheets["Summary Sensor Report"]
         total_row_1 = len(pivot) + 1
@@ -27,12 +70,8 @@ def generate_excel_report(df, pivot, client_df, summary_client_df):
             f"=SUM(E2:E{total_row_1})",
             writer.book.add_format({"num_format": "0.00"})
         )
-
-        # Detailed Client Report
         if not client_df.empty:
             client_df.to_excel(writer, sheet_name="Detailed Client Report", index=False)
-
-        # Summary Client Report + Total (only one column summed!)
         if not summary_client_df.empty:
             summary_client_df.to_excel(writer, sheet_name="Summary Client Report", index=False)
             ws2 = writer.sheets["Summary Client Report"]
@@ -45,8 +84,6 @@ def generate_excel_report(df, pivot, client_df, summary_client_df):
                 f"=SUM({col_letter}2:{col_letter}{total_row_2})",
                 writer.book.add_format({"num_format": "0.00"})
             )
-
-        # Adjust column widths
         for sheet_name, data in {
             "Detailed Sensor Report": df,
             "Summary Sensor Report": pivot,
@@ -57,20 +94,17 @@ def generate_excel_report(df, pivot, client_df, summary_client_df):
                 worksheet = writer.sheets[sheet_name]
                 for i, col in enumerate(data.columns):
                     worksheet.set_column(i, i, 23)
-
     output.seek(0)
     return output
+
 
 @st.cache_data
 def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_str):
     prs = Presentation("New Impact Report Template.pptx")
-
-    # Title slide (layout 0)
     title_slide = prs.slides.add_slide(prs.slide_layouts[0])
     title_slide.placeholders[0].text = f"Impact Report for {account_name}"
     title_slide.placeholders[1].text = f"{from_str} to {to_str}"
 
-    # Add Total to sensor summary
     pivot_with_total = pivot.copy()
     total_row = {
         "Service Area": "Total",
@@ -80,32 +114,24 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
         "Avg Critical Hours Per Day": pivot["Avg Critical Hours Per Day"].sum()
     }
     pivot_with_total = pd.concat([pivot_with_total, pd.DataFrame([total_row])], ignore_index=True)
-
-    # Add sensor slide
     add_table_slide(prs, pivot_with_total, "Summary Sensor Report")
 
-    # Add client summary if it exists
     if not summary_client_df.empty:
         client_summary_with_total = summary_client_df.copy()
-
         total_row = {
             "Location": "Total",
             "Days Back": "",
             "Client Count": ""
         }
-
         if "Avg Critical Hours Per Day" in client_summary_with_total.columns:
             total_row["Avg Critical Hours Per Day"] = client_summary_with_total["Avg Critical Hours Per Day"].sum()
-
         for col in client_summary_with_total.columns:
             if col not in total_row:
                 total_row[col] = ""
-
         client_summary_with_total = pd.concat(
             [client_summary_with_total, pd.DataFrame([total_row])],
             ignore_index=True
         )
-
         add_table_slide(prs, client_summary_with_total, "Summary Client Report")
 
     ppt_output = BytesIO()
@@ -117,8 +143,6 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
 
     ppt_output.seek(0)
     return ppt_output
-
-
 # Main App
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
 st.title("📊 7SIGNAL Total Impact Report")
