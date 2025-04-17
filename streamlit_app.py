@@ -59,37 +59,55 @@ def generate_excel_report(df, pivot, client_df, summary_client_df):
     output.seek(0)
     return output
 
-@st.cache_data
-def generate_ppt_summary(pivot, summary_client_df):
-    prs = Presentation()
 
+@st.cache_data
+def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_str):
+    # 1) Load the user’s template
+    prs = Presentation("/mnt/data/Template Impact Report.pptx")  
+
+    # 2) Title slide (layout 0)
+    title_slide = prs.slides.add_slide(prs.slide_layouts[0])
+    # placeholder 0 is the main title, placeholder 1 is the subtitle
+    title_slide.placeholders[0].text = f"{account_name} Impact Report"
+    title_slide.placeholders[1].text = f"{from_str} to {to_str}"
+
+    # 3) Helper to add a table slide using layout 2
     def add_table_slide(df, title):
-        title_slide = prs.slides.add_slide(prs.slide_layouts[0])
-        title_slide.shapes.title.text = title
-        if len(title_slide.placeholders) > 1:
-            title_slide.placeholders[1].text = f"Top 10 by Critical Hours — {datetime.now().strftime('%Y-%m-%d')}"
-        slide = prs.slides.add_slide(prs.slide_layouts[5])
-        table = slide.shapes.add_table(
-            df.shape[0] + 1, df.shape[1],
-            Inches(0.5), Inches(1),
-            Inches(9), Inches(0.3 * df.shape[0])
+        slide = prs.slides.add_slide(prs.slide_layouts[2])
+        # the first placeholder is the slide heading
+        slide.placeholders[0].text = title
+
+        # insert table below the heading (you can tweak the Inches() as needed)
+        tbl = slide.shapes.add_table(
+            rows=df.shape[0] + 1,
+            cols=df.shape[1],
+            left=Inches(0.5),
+            top=Inches(1.5),
+            width=Inches(9),
+            height=Inches(0.3 * df.shape[0])
         ).table
-        for i, col in enumerate(df.columns):
-            table.cell(0, i).text = str(col)
-        for i, row in enumerate(df.values):
-            for j, val in enumerate(row):
-                cell = table.cell(i + 1, j)
+
+        # header row
+        for col_idx, col_name in enumerate(df.columns):
+            tbl.cell(0, col_idx).text = str(col_name)
+        # data rows
+        for r, row in enumerate(df.values, start=1):
+            for c, val in enumerate(row):
+                cell = tbl.cell(r, c)
                 cell.text = str(val)
                 cell.text_frame.paragraphs[0].font.size = Pt(10)
 
-    add_table_slide(pivot.head(10), "📊 Summary Sensor Report")
+    # 4) Add your two summary slides
+    add_table_slide(pivot.head(10),               "📊 Summary Sensor Report")
     if not summary_client_df.empty:
         add_table_slide(summary_client_df.head(10), "👥 Summary Client Report")
 
+    # 5) Return the binary
     ppt_output = BytesIO()
     prs.save(ppt_output)
     ppt_output.seek(0)
     return ppt_output
+
 
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
 st.title("📊 7SIGNAL Total Impact Report")
@@ -291,7 +309,7 @@ if st.button("Generate Report!"):
 
     # Export reports
     excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
-    ppt_output   = generate_ppt_summary(pivot, summary_client_df)
+    ppt_output   = generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_str)
 
     from_str      = from_datetime.strftime("%Y-%m-%d")
     to_str        = to_datetime.strftime("%Y-%m-%d")
