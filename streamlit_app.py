@@ -30,6 +30,22 @@ def generate_excel_report(df, pivot, client_df, summary_client_df):
             client_df.to_excel(writer, sheet_name="Detailed Client Report", index=False)
         if not summary_client_df.empty:
             summary_client_df.to_excel(writer, sheet_name="Summary Client Report", index=False)
+            # —————— SUMMARY CLIENT REPORT TOTAL ——————
+            ws2 = writer.sheets["Summary Client Report"]
+            total_row_2 = len(summary_client_df) + 1
+            # “Total” label in column A
+            ws2.write(total_row_2, 0, "Total")
+            # find the column index of your Avg column
+            avg_idx = summary_client_df.columns.get_loc("Avg Critical Hours Per Day")
+            # convert to Excel letter (0→A, 1→B, …)
+            col_letter = chr(ord("A") + avg_idx)
+            # SUM from row 2 to the last data row
+            ws2.write_formula(
+                total_row_2, avg_idx,
+                f"=SUM({col_letter}2:{col_letter}{total_row_2})",
+                writer.book.add_format({"num_format":"0.00"})
+            )
+
         for sheet_name, data in {
             "Detailed Sensor Report": df,
             "Summary Sensor Report": pivot,
