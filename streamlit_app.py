@@ -70,104 +70,54 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
     title_slide.placeholders[0].text = f"Impact Report for {account_name}"
     title_slide.placeholders[1].text = f"{from_str} to {to_str}"
 
-    # Create a copy of the pivot to append the total row for PowerPoint
+    # Add Total to sensor summary
     pivot_with_total = pivot.copy()
-    
-    # Add a Total row
     total_row = {
         "Service Area": "Total",
-        "Days Back": "",  # You could also set this to the actual value if you prefer
+        "Days Back": "",
         "Network": "",
         "Band": "",
         "Avg Critical Hours Per Day": pivot["Avg Critical Hours Per Day"].sum()
     }
     pivot_with_total = pd.concat([pivot_with_total, pd.DataFrame([total_row])], ignore_index=True)
 
-def add_table_slide(prs, df, title):
-    slide = prs.slides.add_slide(prs.slide_layouts[2])
+    # Add sensor slide
+    add_table_slide(prs, pivot_with_total, "Summary Sensor Report")
 
-    # Safely set slide title
-    title_placeholder = next((ph for ph in slide.placeholders if ph.placeholder_format.type == 1), None)
-    if title_placeholder:
-        title_placeholder.text = title
-
-    # Calculate centering position
-    slide_width = prs.slide_width
-    table_width = Inches(10.5)
-    left_margin = (slide_width - table_width) / 2
-
-    # Create centered table
-    tbl = slide.shapes.add_table(
-        rows=df.shape[0] + 1,
-        cols=df.shape[1],
-        left=left_margin,
-        top=Inches(1.5),
-        width=table_width,
-        height=Inches(0.3 * df.shape[0])
-    ).table
-
-    # Header
-    for c, col_name in enumerate(df.columns):
-        cell = tbl.cell(0, c)
-        cell.text = str(col_name)
-        para = cell.text_frame.paragraphs[0]
-        para.font.bold = True
-        para.alignment = PP_ALIGN.CENTER
-
-    # Rows
-    for r, row in enumerate(df.values, start=1):
-        is_total_row = str(row[0]).strip().lower() == "total"
-        for c, val in enumerate(row):
-            cell = tbl.cell(r, c)
-            try:
-                cell.text = "" if pd.isna(val) else str(val)
-            except Exception:
-                cell.text = "?"
-            para = cell.text_frame.paragraphs[0]
-            para.font.size = Pt(10)
-            para.alignment = PP_ALIGN.CENTER
-
-            if is_total_row:
-                para.font.bold = True
-                cell.fill.solid()
-                cell.fill.fore_color.rgb = RGBColor(255, 230, 153)  # light yellow
-    
-    add_table_slide(pivot_with_total, "Summary Sensor Report")
-
+    # Add client summary if it exists
     if not summary_client_df.empty:
         client_summary_with_total = summary_client_df.copy()
 
-        # Compute total row
         total_row = {
             "Location": "Total",
             "Days Back": "",
-            "Client Count": client_summary_with_total["Client Count"].sum()
+            "Client Count": ""
         }
-    
-        
-        
-        # Only total the final column: Avg Critical Hours Per Day
+
         if "Avg Critical Hours Per Day" in client_summary_with_total.columns:
             total_row["Avg Critical Hours Per Day"] = client_summary_with_total["Avg Critical Hours Per Day"].sum()
-        
-        # Add empty values for other columns to preserve structure
+
         for col in client_summary_with_total.columns:
             if col not in total_row:
                 total_row[col] = ""
-    
-        # Append total row to the DataFrame
+
         client_summary_with_total = pd.concat(
             [client_summary_with_total, pd.DataFrame([total_row])],
             ignore_index=True
         )
-    
-        # Send to slide (use full, not .head(10), since Total might be at the end)
-        add_table_slide(client_summary_with_total, "Summary Client Report")
+
+        add_table_slide(prs, client_summary_with_total, "Summary Client Report")
 
     ppt_output = BytesIO()
-    prs.save(ppt_output)
+    try:
+        prs.save(ppt_output)
+    except Exception as e:
+        st.error(f"Error saving PowerPoint file: {e}")
+        return None
+
     ppt_output.seek(0)
     return ppt_output
+
 
 # Main App
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
