@@ -91,22 +91,20 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
         if title_placeholder:
             title_placeholder.text = title
     
-        # Create table
+        # Calculate centering position
+        slide_width = prs.slide_width
+        table_width = Inches(10.5)
+        left_margin = (slide_width - table_width) / 2
+        
+        # Create centered table
         tbl = slide.shapes.add_table(
             rows=df.shape[0] + 1,
             cols=df.shape[1],
-            slide_width = prs.slide_width
-            table_width = Inches(10.5)
-            left_margin = (slide_width - table_width) / 2
-            
-            tbl = slide.shapes.add_table(
-                rows=df.shape[0] + 1,
-                cols=df.shape[1],
-                left=left_margin,
-                top=Inches(1.5),
-                width=table_width,
-                height=Inches(0.3 * df.shape[0])
-            ).table
+            left=left_margin,
+            top=Inches(1.5),
+            width=table_width,
+            height=Inches(0.3 * df.shape[0])
+        ).table
     
         # Header
         for c, col_name in enumerate(df.columns):
