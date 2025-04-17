@@ -104,13 +104,21 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
     
         # Rows
         for r, row in enumerate(df.values, start=1):
+            is_total_row = str(row[0]).strip().lower() == "total"
             for c, val in enumerate(row):
                 cell = tbl.cell(r, c)
                 try:
                     cell.text = "" if pd.isna(val) else str(val)
                 except Exception:
                     cell.text = "?"
-                cell.text_frame.paragraphs[0].font.size = Pt(10)
+                para = cell.text_frame.paragraphs[0]
+                para.font.size = Pt(10)
+    
+                # 💡 Highlight the "Total" row
+                if is_total_row:
+                    para.font.bold = True
+                    cell.fill.solid()
+                    cell.fill.fore_color.rgb = RGBColor(255, 230, 153)  # light yellow
 
 
     add_table_slide(pivot_with_total, "Summary Sensor Report")
