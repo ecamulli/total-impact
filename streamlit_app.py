@@ -11,7 +11,6 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 
 @st.cache_data
-@st.cache_data
 def generate_excel_report(df, pivot, client_df, summary_client_df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
@@ -146,12 +145,7 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
             "Client Count": client_summary_with_total["Client Count"].sum()
         }
     
-        # Add totals for each KPI column
-        total_row = {
-            "Location": "Total",
-            "Days Back": "",
-            "Client Count": ""  # Optional: you could sum client count too if you want
-        }
+        
         
         # Only total the final column: Avg Critical Hours Per Day
         if "Avg Critical Hours Per Day" in client_summary_with_total.columns:
