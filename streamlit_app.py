@@ -218,6 +218,8 @@ if st.button("Generate Report!"):
         type_cols = [c for c in summary_client_df.columns if c not in ['Location', 'Client Count', 'Days Back']]
         summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
         summary_client_df['Avg Critical Hours Per Day'] = summary_client_df[type_cols].mean(axis=1).round(2)
+        if 'Avg Critical Hours Per Day' in summary_client_df.columns:
+            summary_client_df = summary_client_df.sort_values(by='Avg Critical Hours Per Day', ascending=False)
         summary_client_df = summary_client_df.sort_values(by='Avg Critical Hours Per Day', ascending=False)
 
     excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
