@@ -63,7 +63,7 @@ def generate_excel_report(df, pivot, client_df, summary_client_df):
 @st.cache_data
 def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_str):
     # 1) Load the user’s template
-    prs = Presentation("/mnt/data/Template Impact Report.pptx")  
+    prs = Presentation("Template Impact Report.pptx")  
 
     # 2) Title slide (layout 0)
     title_slide = prs.slides.add_slide(prs.slide_layouts[0])
