@@ -345,21 +345,16 @@ if st.button("Generate Report!"):
         summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
         summary_client_df['Avg Critical Hours Per Day'] = summary_client_df[type_cols].mean(axis=1).round(2)
 
-    # Finally, download buttons
+    # Download button
     excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
     from_str = from_datetime.strftime('%Y-%m-%d')
     to_str   = to_datetime.strftime('%Y-%m-%d')
     ppt_output = generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_str)
 
     st.download_button(
-        "🗕 Download Excel Report",
+        "Download Excel Report",
         data=excel_output,
         file_name=f"{account_name}_impact_report_{from_str}_to_{to_str}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    #st.download_button(
-    #    "🎮 Download PowerPoint Summary",
-    #    data=ppt_output,
-    #    file_name=f"{account_name}_impact_report_{from_str}_to_{to_str}.pptx",
-    #    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-    #)
+    
