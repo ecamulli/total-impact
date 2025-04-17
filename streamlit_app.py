@@ -83,55 +83,54 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
     }
     pivot_with_total = pd.concat([pivot_with_total, pd.DataFrame([total_row])], ignore_index=True)
 
-    
-    def add_table_slide(df, title):
-        slide = prs.slides.add_slide(prs.slide_layouts[2])
-    
-        # Safely set slide title
-        title_placeholder = next((ph for ph in slide.placeholders if ph.placeholder_format.type == 1), None)
-        if title_placeholder:
-            title_placeholder.text = title
-    
-        # Calculate centering position
-        slide_width = prs.slide_width
-        table_width = Inches(10.5)
-        left_margin = (slide_width - table_width) / 2
-    
-        # Create centered table
-        tbl = slide.shapes.add_table(
-            rows=df.shape[0] + 1,
-            cols=df.shape[1],
-            left=left_margin,
-            top=Inches(1.5),
-            width=table_width,
-            height=Inches(0.3 * df.shape[0])
-        ).table
-    
-        # Header
-        for c, col_name in enumerate(df.columns):
-            cell = tbl.cell(0, c)
-            cell.text = str(col_name)
+def add_table_slide(prs, df, title):
+    slide = prs.slides.add_slide(prs.slide_layouts[2])
+
+    # Safely set slide title
+    title_placeholder = next((ph for ph in slide.placeholders if ph.placeholder_format.type == 1), None)
+    if title_placeholder:
+        title_placeholder.text = title
+
+    # Calculate centering position
+    slide_width = prs.slide_width
+    table_width = Inches(10.5)
+    left_margin = (slide_width - table_width) / 2
+
+    # Create centered table
+    tbl = slide.shapes.add_table(
+        rows=df.shape[0] + 1,
+        cols=df.shape[1],
+        left=left_margin,
+        top=Inches(1.5),
+        width=table_width,
+        height=Inches(0.3 * df.shape[0])
+    ).table
+
+    # Header
+    for c, col_name in enumerate(df.columns):
+        cell = tbl.cell(0, c)
+        cell.text = str(col_name)
+        para = cell.text_frame.paragraphs[0]
+        para.font.bold = True
+        para.alignment = PP_ALIGN.CENTER
+
+    # Rows
+    for r, row in enumerate(df.values, start=1):
+        is_total_row = str(row[0]).strip().lower() == "total"
+        for c, val in enumerate(row):
+            cell = tbl.cell(r, c)
+            try:
+                cell.text = "" if pd.isna(val) else str(val)
+            except Exception:
+                cell.text = "?"
             para = cell.text_frame.paragraphs[0]
-            para.font.bold = True
+            para.font.size = Pt(10)
             para.alignment = PP_ALIGN.CENTER
-    
-        # Rows
-        for r, row in enumerate(df.values, start=1):
-            is_total_row = str(row[0]).strip().lower() == "total"
-            for c, val in enumerate(row):
-                cell = tbl.cell(r, c)
-                try:
-                    cell.text = "" if pd.isna(val) else str(val)
-                except Exception:
-                    cell.text = "?"
-                para = cell.text_frame.paragraphs[0]
-                para.font.size = Pt(10)
-                para.alignment = PP_ALIGN.CENTER
-    
-                if is_total_row:
-                    para.font.bold = True
-                    cell.fill.solid()
-                    cell.fill.fore_color.rgb = RGBColor(255, 230, 153)  # light yellow
+
+            if is_total_row:
+                para.font.bold = True
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = RGBColor(255, 230, 153)  # light yellow
     
     add_table_slide(pivot_with_total, "Summary Sensor Report")
 
