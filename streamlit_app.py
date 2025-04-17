@@ -68,6 +68,20 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
     title_slide.placeholders[0].text = f"Impact Report for {account_name}"
     title_slide.placeholders[1].text = f"{from_str} to {to_str}"
 
+    # Create a copy of the pivot to append the total row for PowerPoint
+    pivot_with_total = pivot.copy()
+    
+    # Add a Total row
+    total_row = {
+        "Service Area": "Total",
+        "Days Back": "",  # You could also set this to the actual value if you prefer
+        "Network": "",
+        "Band": "",
+        "Avg Critical Hours Per Day": pivot["Avg Critical Hours Per Day"].sum()
+    }
+    pivot_with_total = pd.concat([pivot_with_total, pd.DataFrame([total_row])], ignore_index=True)
+
+    
     def add_table_slide(df, title):
         slide = prs.slides.add_slide(prs.slide_layouts[2])
     
@@ -99,9 +113,31 @@ def generate_ppt_summary(pivot, summary_client_df, account_name, from_str, to_st
                 cell.text_frame.paragraphs[0].font.size = Pt(10)
 
 
-    add_table_slide(pivot.head(10), "📊 Summary Sensor Report")
+    add_table_slide(pivot_with_total, "Summary Sensor Report")
+
     if not summary_client_df.empty:
-        add_table_slide(summary_client_df.head(10), "👥 Summary Client Report")
+        client_summary_with_total = summary_client_df.copy()
+
+        # Compute total row
+        total_row = {
+            "Location": "Total",
+            "Days Back": "",
+            "Client Count": client_summary_with_total["Client Count"].sum()
+        }
+    
+        # Add totals for each KPI column
+        for col in client_summary_with_total.columns:
+            if col not in ["Location", "Days Back", "Client Count"]:
+                total_row[col] = client_summary_with_total[col].sum()
+    
+        # Append total row to the DataFrame
+        client_summary_with_total = pd.concat(
+            [client_summary_with_total, pd.DataFrame([total_row])],
+            ignore_index=True
+        )
+    
+        # Send to slide (use full, not .head(10), since Total might be at the end)
+        add_table_slide(client_summary_with_total, "Summary Client Report")
 
     ppt_output = BytesIO()
     prs.save(ppt_output)
