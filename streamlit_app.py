@@ -75,9 +75,9 @@ kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated
 
 # Time range setup
 st.markdown("### ⏱️ Select Date and Time Range (Eastern Time - ET)")
-eastern     = pytz.timezone("US/Eastern")
-now_et      = datetime.now(eastern)
-default_to  = now_et
+eastern      = pytz.timezone("US/Eastern")
+now_et       = datetime.now(eastern)
+default_to   = now_et
 default_from = default_to - timedelta(days=7)
 
 if "from_date" not in st.session_state:
@@ -86,10 +86,10 @@ if "from_date" not in st.session_state:
     st.session_state.to_date   = default_to.date()
     st.session_state.to_time   = default_to.time()
 
-from_date       = st.date_input("From Date (ET)", value=st.session_state.from_date)
-from_time_input = st.time_input("From Time (ET)", value=st.session_state.from_time)
-to_date         = st.date_input("To Date (ET)",   value=st.session_state.to_date)
-to_time_input   = st.time_input("To Time (ET)",   value=st.session_state.to_time)
+from_date       = st.date_input("From Date (ET)",   value=st.session_state.from_date)
+from_time_input = st.time_input("From Time (ET)",   value=st.session_state.from_time)
+to_date         = st.date_input("To Date (ET)",     value=st.session_state.to_date)
+to_time_input   = st.time_input("To Time (ET)",     value=st.session_state.to_time)
 
 from_datetime = eastern.localize(datetime.combine(from_date, from_time_input))
 to_datetime   = eastern.localize(datetime.combine(to_date,   to_time_input))
@@ -159,7 +159,7 @@ def get_kpi_data(headers, sa, net, code, from_ts, to_ts, days_back):
                 sla        = m.get("slaValue") or 0
                 total_mins = (to_ts - from_ts) / 1000 / 60
                 crit_samp  = round(samples * (1 - sla/100), 2)
-                crit_mins  = crit_samp * (total_mins/samples) if samples else 0
+                crit_mins  = crit_samp * (total_mins / samples) if samples else 0
                 results.append({
                     "Service Area": sa["name"],
                     "Network": net["name"],
@@ -238,7 +238,7 @@ if st.button("Generate Report!"):
                 })
     client_df = pd.DataFrame(rows)
 
-    # Always initialize summary_client_df
+    # Always initialize summary_client_df at the same level as client_df
     summary_client_df = pd.DataFrame()
     if not client_df.empty:
         summary_client_df = client_df.pivot_table(
@@ -254,8 +254,7 @@ if st.button("Generate Report!"):
                 c for c in summary_client_df.columns
                 if c not in ["Location", "Client Count", "Days Back"]
             ]
-            summary_client_df[type_cols] = summary_client_df[type_cols].round(2)
-            summary_client_df[type_cols] = summary_client_df[type_cols].fillna(0)
+            summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
             summary_client_df["Avg Critical Hours Per Day"] = (
                 summary_client_df[type_cols].mean(axis=1).round(2)
             )
@@ -267,8 +266,8 @@ if st.button("Generate Report!"):
     excel_output = generate_excel_report(df, pivot, client_df, summary_client_df)
     ppt_output   = generate_ppt_summary(pivot, summary_client_df)
 
-    from_str     = from_datetime.strftime("%Y-%m-%d")
-    to_str       = to_datetime.strftime("%Y-%m-%d")
+    from_str      = from_datetime.strftime("%Y-%m-%d")
+    to_str        = to_datetime.strftime("%Y-%m-%d")
     base_filename = f"{account_name}_impact_report_from_{from_str}_to_{to_str}"
 
     st.download_button(
