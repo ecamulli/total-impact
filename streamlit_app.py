@@ -161,7 +161,7 @@ if st.button("Generate Report!"):
     kpi_codes = [k.strip() for k in kpi_codes_input.split(",")][:4]
 
     results = []
-    with ThreadPoolExecutor(max_workers=6) as ex:
+    with ThreadPoolExecutor(max_workers=3) as ex:
         futures = [
             ex.submit(get_kpi_data, headers, sa, net, code, from_ts, to_ts, days_back)
             for sa in service_areas for net in networks for code in kpi_codes
