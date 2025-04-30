@@ -26,14 +26,15 @@ def generate_excel_report(df, pivot, client_df, summary_client_df, days_back, se
         ws1 = writer.sheets["Summary Sensor Report"]
         total_row_1 = len(pivot) + 1
         ws1.write(total_row_1, 0, "Total")
-        # Add total formulas for KPI Name columns, Avg Critical Hours Per Day, Total Samples, and Total Critical Samples
+        # Add total formulas for KPI Name columns, Total Samples, Total Critical Samples, and Avg Critical Hours Per Day
         total_columns = [col for col in pivot.columns if col not in ["Service Area", "Network", "Band"]]
         for idx, col in enumerate(total_columns, start=3):  # Start after Service Area, Network, Band
             col_letter = chr(ord('A') + idx)
+            num_format = "0" if col == "Total Critical Samples" else "0.00"
             ws1.write_formula(
                 total_row_1, idx,
                 f"=SUM({col_letter}2:{col_letter}{total_row_1})",
-                writer.book.add_format({"num_format": "0.00"})
+                writer.book.add_format({"num_format": num_format})
             )
         if not client_df.empty:
             client_df.to_excel(writer, sheet_name="Detailed Client Report", index=False)
@@ -108,11 +109,11 @@ if business_hours_per_day <= 0:
     st.stop()
 
 # Validate date range
-if to_datetime > now_et:
-    st.warning("'To' date cannot be in the future.")
-    to_datetime = eastern.localize(datetime.combine(to_date, business_end))
-if from_datetime > to_datetime:
-    st.error("'From' must be before 'To'")
+if to_date > now_et.date():
+    st.error("'To' date cannot be in the future.")
+    st.stop()
+if from_date > to_date:
+    st.error("'From' date must be before 'To' date.")
     st.stop()
 
 # Generate list of business hour windows for selected days
@@ -242,7 +243,7 @@ if st.button("Generate Report!"):
             results.extend(f.result())
 
     if not results:
-        st.warning("No KPI data found.")
+        st.warning(f"No KPI data found for {kpi_codes_input}. Try different codes.")
         st.stop()
 
     df = pd.DataFrame(results)
@@ -274,15 +275,18 @@ if st.button("Generate Report!"):
     pivot_critical_samples = (
         df.groupby(["Service Area", "Network", "Band"])["Critical Samples"]
         .sum()
+        .round(0)  # Round to whole number
         .reset_index()
         .rename(columns={"Critical Samples": "Total Critical Samples"})
     )
-    # Merge all pivot tables
-    pivot = pivot_kpi.merge(pivot_critical, on=["Service Area", "Network", "Band"])
-    pivot = pivot.merge(pivot_samples, on=["Service Area", "Network", "Band"])
+    # Merge all pivot tables, ensuring Avg Critical Hours Per Day is at the end
+    pivot = pivot_kpi.merge(pivot_samples, on=["Service Area", "Network", "Band"])
     pivot = pivot.merge(pivot_critical_samples, on=["Service Area", "Network", "Band"])
+    pivot = pivot.merge(pivot_critical, on=["Service Area", "Network", "Band"])
     pivot = pivot.sort_values(by=["Service Area", "Network", "Band"])
     pivot = pivot.round(2).fillna(0)
+    # Ensure Total Critical Samples is integer
+    pivot["Total Critical Samples"] = pivot["Total Critical Samples"].astype(int)
 
     # Fetch client KPI data for business hours
     rows = []
