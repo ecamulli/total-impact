@@ -117,7 +117,7 @@ if business_hours_per_day <= 0:
 
 # Validate date range
 if to_date > now_et.date():
-    st.error("'To'/js
+    st.error("'To' date cannot be in the future.")
     st.stop()
 if from_date > to_date:
     st.error("'From' date must be before 'To' date.")
