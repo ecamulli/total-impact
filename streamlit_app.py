@@ -26,9 +26,9 @@ def generate_excel_report(df, pivot, client_df, summary_client_df, days_back, se
         ws1 = writer.sheets["Summary Sensor Report"]
         total_row_1 = len(pivot) + 1
         ws1.write(total_row_1, 0, "Total")
-        # Add total formulas for each KPI Name column
-        kpi_columns = [col for col in pivot.columns if col not in ["Service Area", "Network", "Band"]]
-        for idx, kpi in enumerate(kpi_columns, start=3):  # Start after Service Area, Network, Band
+        # Add total formulas for KPI Name columns, Avg Critical Hours Per Day, Total Samples, and Total Critical Samples
+        total_columns = [col for col in pivot.columns if col not in ["Service Area", "Network", "Band"]]
+        for idx, col in enumerate(total_columns, start=3):  # Start after Service Area, Network, Band
             col_letter = chr(ord('A') + idx)
             ws1.write_formula(
                 total_row_1, idx,
@@ -72,17 +72,12 @@ client_id = st.text_input("Client ID")
 client_secret = st.text_input("Client Secret", type="password")
 kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
 
-st.markdown("### ⏱️ Select Date and Time Range (Eastern Time - ET)")
+st.markdown("### 📅 Select Date Range (Eastern Time - ET)")
 eastern = pytz.timezone("US/Eastern")
 now_et = datetime.now(eastern)
 default_start = now_et - timedelta(days=7)
 from_date = st.date_input("From Date", value=default_start.date())
-from_time = st.time_input("From Time", value=default_start.time())
 to_date = st.date_input("To Date", value=now_et.date())
-to_time = st.time_input("To Time", value=now_et.time())
-
-from_datetime = eastern.localize(datetime.combine(from_date, from_time))
-to_datetime = eastern.localize(datetime.combine(to_date, to_time))
 
 st.markdown("### 📅 Select Days of the Week")
 days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -95,6 +90,10 @@ selected_days = st.multiselect(
 st.markdown("### ⏰ Select Business Hours (Eastern Time - ET)")
 business_start = st.time_input("Start of Business Day", value=datetime.strptime("08:00", "%H:%M").time())
 business_end = st.time_input("End of Business Day", value=datetime.strptime("18:00", "%H:%M").time())
+
+# Combine dates with business hours to create datetime objects
+from_datetime = eastern.localize(datetime.combine(from_date, business_start))
+to_datetime = eastern.localize(datetime.combine(to_date, business_end))
 
 # Validate business hours
 if business_end <= business_start:
@@ -110,8 +109,8 @@ if business_hours_per_day <= 0:
 
 # Validate date range
 if to_datetime > now_et:
-    st.warning("'To' time cannot be in the future.")
-    to_datetime = now_et
+    st.warning("'To' date cannot be in the future.")
+    to_datetime = eastern.localize(datetime.combine(to_date, business_end))
 if from_datetime > to_datetime:
     st.error("'From' must be before 'To'")
     st.stop()
@@ -247,7 +246,8 @@ if st.button("Generate Report!"):
         st.stop()
 
     df = pd.DataFrame(results)
-    pivot = (
+    # Create pivot table for KPI Values
+    pivot_kpi = (
         df.pivot_table(
             index=["Service Area", "Network", "Band"],
             columns="KPI Name",
@@ -255,8 +255,33 @@ if st.button("Generate Report!"):
             aggfunc="mean"
         )
         .reset_index()
-        .sort_values(by=["Service Area", "Network", "Band"])
     )
+    # Create pivot table for Avg Critical Hours Per Day
+    pivot_critical = (
+        df.groupby(["Service Area", "Network", "Band"])["Critical Hours Per Day"]
+        .mean()
+        .reset_index()
+        .rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per Day"})
+    )
+    # Create pivot table for Total Samples
+    pivot_samples = (
+        df.groupby(["Service Area", "Network", "Band"])["Samples"]
+        .sum()
+        .reset_index()
+        .rename(columns={"Samples": "Total Samples"})
+    )
+    # Create pivot table for Total Critical Samples
+    pivot_critical_samples = (
+        df.groupby(["Service Area", "Network", "Band"])["Critical Samples"]
+        .sum()
+        .reset_index()
+        .rename(columns={"Critical Samples": "Total Critical Samples"})
+    )
+    # Merge all pivot tables
+    pivot = pivot_kpi.merge(pivot_critical, on=["Service Area", "Network", "Band"])
+    pivot = pivot.merge(pivot_samples, on=["Service Area", "Network", "Band"])
+    pivot = pivot.merge(pivot_critical_samples, on=["Service Area", "Network", "Band"])
+    pivot = pivot.sort_values(by=["Service Area", "Network", "Band"])
     pivot = pivot.round(2).fillna(0)
 
     # Fetch client KPI data for business hours
