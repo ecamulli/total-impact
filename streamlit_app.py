@@ -89,15 +89,22 @@ selected_days = st.multiselect(
 )
 
 st.markdown("### ⏰ Select Business Hours (Eastern Time - ET)")
-business_start = st.time_input("Start of Business Day", value=datetime.strptime("08:00", "%H:%M").time())
-business_end = st.time_input("End of Business Day", value=datetime.strptime("18:00", "%H:%M").time())
+use_24_hours = st.checkbox("Use 24 Hours", value=False)
+if use_24_hours:
+    business_start = datetime.strptime("00:00", "%H:%M").time()
+    business_end = datetime.strptime("23:59", "%H:%M").time()
+    st.time_input("Start of Business Day", value=business_start, disabled=True)
+    st.time_input("End of Business Day", value=business_end, disabled=True)
+else:
+    business_start = st.time_input("Start of Business Day", value=datetime.strptime("08:00", "%H:%M").time())
+    business_end = st.time_input("End of Business Day", value=datetime.strptime("18:00", "%H:%M").time())
 
 # Combine dates with business hours to create datetime objects
 from_datetime = eastern.localize(datetime.combine(from_date, business_start))
 to_datetime = eastern.localize(datetime.combine(to_date, business_end))
 
 # Validate business hours
-if business_end <= business_start:
+if not use_24_hours and business_end <= business_start:
     st.error("End of Business Day must be after Start of Business Day.")
     st.stop()
 
@@ -110,7 +117,7 @@ if business_hours_per_day <= 0:
 
 # Validate date range
 if to_date > now_et.date():
-    st.error("'To' date cannot be in the future.")
+    st.error("'To'/js
     st.stop()
 if from_date > to_date:
     st.error("'From' date must be before 'To' date.")
@@ -283,7 +290,10 @@ if st.button("Generate Report!"):
     pivot = pivot_kpi.merge(pivot_samples, on=["Service Area", "Network", "Band"])
     pivot = pivot.merge(pivot_critical_samples, on=["Service Area", "Network", "Band"])
     pivot = pivot.merge(pivot_critical, on=["Service Area", "Network", "Band"])
-    pivot = pivot.sort_values(by=["Service Area", "Network", "Band"])
+    pivot = pivot.sort_values(
+        by=["Avg Critical Hours Per Day", "Service Area", "Network", "Band"],
+        ascending=[False, True, True, True]
+    )
     pivot = pivot.round(2).fillna(0)
     # Ensure Total Critical Samples is integer
     pivot["Total Critical Samples"] = pivot["Total Critical Samples"].astype(int)
