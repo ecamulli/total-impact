@@ -6,6 +6,17 @@ from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pytz
 import uuid
+import logging
+
+# ========== CONFIG ==========
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", filename="impact_report.log")
+logger = logging.getLogger(__name__)
+
+# Suppress console logging
+logger.handlers = [h for h in logger.handlers if not isinstance(h, logging.StreamHandler)]
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.CRITICAL)  # Only critical errors to console
+logger.addHandler(console_handler)
 
 @st.cache_data
 def generate_excel_report(df, pivot, client_df, summary_client_df, days_back, selected_days, business_start, business_end):
@@ -72,6 +83,60 @@ account_name = st.text_input("Account Name")
 client_id = st.text_input("Client ID")
 client_secret = st.text_input("Client Secret", type="password")
 kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
+
+# Initialize session state for networks
+if "networks" not in st.session_state:
+    st.session_state.networks = []
+
+# Authenticate and fetch networks
+def authenticate(cid, secret):
+    try:
+        r = requests.post(
+            "https://api-v2.7signal.com/oauth2/token",
+            data={"client_id": cid, "client_secret": secret, "grant_type": "client_credentials"},
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
+        return r.json().get("access_token") if r.status_code == 200 else None
+    except Exception as e:
+        logger.error(f"Authentication error: {e}")
+        return None
+
+def get_networks(headers):
+    """Fetch all network names from the API."""
+    try:
+        response = requests.get("https://api-v2.7signal.com/networks/sensors", headers=headers, timeout=10)
+        response.raise_for_status()
+        networks = response.json().get("results", [])
+        network_names = [network.get("name", "").strip() for network in networks if network.get("name")]
+        logger.debug(f"Parsed network names: {network_names}")
+        return sorted(set(network_names))  # Remove duplicates and sort
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch networks: {e}")
+        return []
+
+if client_id and client_secret:
+    token = authenticate(client_id, client_secret)
+    if token:
+        headers = {"Authorization": f"Bearer {token}"}
+        st.session_state.networks = get_networks(headers)
+    else:
+        st.error("Authentication failed. Please check your Client ID and Client Secret.")
+        st.stop()
+else:
+    st.warning("Please enter Client ID and Client Secret to fetch available networks.")
+    st.stop()
+
+# Network selection
+if st.session_state.networks:
+    selected_networks = st.multiselect(
+        "Select Networks",
+        options=st.session_state.networks,
+        help=f"Choose from available networks: {', '.join(st.session_state.networks)}",
+        default=st.session_state.networks  # Default to all networks
+    )
+else:
+    st.error("No networks available. Please check your credentials or API connectivity.")
+    st.stop()
 
 st.markdown("### 📅 Select Date Range (Eastern Time - ET)")
 eastern = pytz.timezone("US/Eastern")
@@ -161,29 +226,20 @@ if days_back > 30:
 
 st.markdown(f"🗓 Selected Range: **{days_back:.2f} business days** ({business_start.strftime('%I:%M %p')} to {business_end.strftime('%I:%M %p')}, {', '.join(selected_days)})")
 
-def authenticate(cid, secret):
-    try:
-        r = requests.post(
-            "https://api-v2.7signal.com/oauth2/token",
-            data={"client_id": cid, "client_secret": secret, "grant_type": "client_credentials"},
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
-        )
-        return r.json().get("access_token") if r.status_code == 200 else None
-    except:
-        return None
-
 def safe_get(url, headers):
     try:
-        r = requests.get(url, headers=headers)
+        r = requests.get(url, headers=headers, timeout=10)
         return r if r.status_code == 200 else None
-    except:
+    except requests.RequestException as e:
+        logger.error(f"Request error for URL {url}: {e}")
         return None
 
 def get_service_areas(headers):
     r = safe_get("https://api-v2.7signal.com/topologies/sensors/serviceAreas", headers)
     return r.json().get("results", []) if r else []
 
-def get_networks(headers):
+def get_all_networks(headers):
+    """Fetch all network objects from the API."""
     r = safe_get("https://api-v2.7signal.com/networks/sensors", headers)
     return r.json().get("results", []) if r else []
 
@@ -226,8 +282,8 @@ def get_kpi_data(headers, sa, net, code, time_windows, days_back):
     return results
 
 if st.button("Generate Report!"):
-    if not all([account_name, client_id, client_secret, kpi_codes_input]):
-        st.warning("All fields are required.")
+    if not all([account_name, client_id, client_secret, kpi_codes_input, selected_networks]):
+        st.warning("All fields, including at least one network, are required.")
         st.stop()
 
     token = authenticate(client_id, client_secret)
@@ -237,8 +293,14 @@ if st.button("Generate Report!"):
 
     headers = {"Authorization": f"Bearer {token}"}
     service_areas = get_service_areas(headers)
-    networks = get_networks(headers)
+    all_networks = get_all_networks(headers)
+    # Filter networks by selected names
+    networks = [net for net in all_networks if net.get("name", "").strip() in selected_networks]
     kpi_codes = [k.strip() for k in kpi_codes_input.split(",")][:4]
+
+    if not networks:
+        st.warning("No matching networks found for the selected options.")
+        st.stop()
 
     results = []
     with ThreadPoolExecutor(max_workers=3) as ex:
@@ -250,7 +312,7 @@ if st.button("Generate Report!"):
             results.extend(f.result())
 
     if not results:
-        st.warning(f"No KPI data found for {kpi_codes_input}. Try different codes.")
+        st.warning(f"No KPI data found for {kpi_codes_input}. Try different codes or networks.")
         st.stop()
 
     df = pd.DataFrame(results)
