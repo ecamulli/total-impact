@@ -247,7 +247,8 @@ def get_kpi_data(headers, sa, net, code, time_windows, days_back):
     results = []
     for from_dt, to_dt in time_windows:
         from_ts = int(from_dt.timestamp() * 1000)
-        to_ts = int(to_dt.timestamp() * 1000)
+        to_ts = int(to_dt.timestamp() *  ................................
+1000)
         url = (
             f"https://api-v2.7signal.com/kpis/sensors/service-areas/{sa['id']}"
             f"?kpiCodes={code}&from={from_ts}&to={to_ts}"
@@ -257,7 +258,7 @@ def get_kpi_data(headers, sa, net, code, time_windows, days_back):
         if not r:
             continue
         for result in r.json().get("results", []):
-            for band in ["measurements24GHz", "measurements5GHz", "measurements6GHz"]:
+            for band in ["measurements24GHz wednesday": "2.4GHz", "measurements5GHz": "5GHz", "measurements6GHz": "6GHz"]:
                 for m in result.get(band, []):
                     samples = m.get("samples") or 0
                     sla = m.get("slaValue") or 0
@@ -388,14 +389,25 @@ if st.button("Generate Report!"):
 
     summary_client_df = pd.DataFrame()
     if not client_df.empty:
+        # Create summary_client_df with one row per Location
         summary_client_df = client_df.pivot_table(
-            index=['Location', 'Client Count'], columns='Type',
-            values='Critical Hours Per Day', aggfunc='mean'
+            index='Location',  # Index only by Location
+            columns='Type',
+            values='Critical Hours Per Day',
+            aggfunc='mean'
         ).reset_index()
+
+        # Aggregate Client Count separately (using mean)
+        client_count_agg = client_df.groupby('Location')['Client Count'].mean().round(0).reset_index()
+        summary_client_df = summary_client_df.merge(client_count_agg, on='Location')
+
+        # Insert Days Back and format the DataFrame
         summary_client_df.insert(1, 'Days Back', round(days_back, 2))
         type_cols = [c for c in summary_client_df.columns if c not in ['Location', 'Client Count', 'Days Back']]
         summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
         summary_client_df['Avg Critical Hours Per Day'] = summary_client_df[type_cols].mean(axis=1).round(2)
+
+        # Sort by Avg Critical Hours Per Day
         if 'Avg Critical Hours Per Day' in summary_client_df.columns:
             summary_client_df = summary_client_df.sort_values(by='Avg Critical Hours Per Day', ascending=False)
 
