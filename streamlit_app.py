@@ -247,8 +247,7 @@ def get_kpi_data(headers, sa, net, code, time_windows, days_back):
     results = []
     for from_dt, to_dt in time_windows:
         from_ts = int(from_dt.timestamp() * 1000)
-        to_ts = int(to_dt.timestamp() *  ................................
-1000)
+        to_ts = int(to_dt.timestamp() * 1000)
         url = (
             f"https://api-v2.7signal.com/kpis/sensors/service-areas/{sa['id']}"
             f"?kpiCodes={code}&from={from_ts}&to={to_ts}"
@@ -258,7 +257,7 @@ def get_kpi_data(headers, sa, net, code, time_windows, days_back):
         if not r:
             continue
         for result in r.json().get("results", []):
-            for band in ["measurements24GHz wednesday": "2.4GHz", "measurements5GHz": "5GHz", "measurements6GHz": "6GHz"]:
+            for band in ["measurements24GHz", "measurements5GHz", "measurements6GHz"]:
                 for m in result.get(band, []):
                     samples = m.get("samples") or 0
                     sla = m.get("slaValue") or 0
