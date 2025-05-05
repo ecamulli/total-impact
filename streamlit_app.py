@@ -34,13 +34,18 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
         ws1.write(total_row_1, 0, "Total")
         for col in ["Total Samples", "Total Critical Samples", "Avg Critical Hours Per Day"]:
             if col in pivot.columns:
-                idx = pivot.columns.get_loc(col)
-                import xlsxwriter.utility
-                col_letter = xlsxwriter.utility.xl_col_to_name(idx)
-                num_format = "0" if col == "Total Critical Samples" else "0.00"
-                ws1.write_formula(
-                    total_row_1, idx,
-                    f"=SUM({col_letter}2:{col_letter}{total_row_1})",
+                try:
+                    idx = pivot.columns.get_loc(col)
+                    import xlsxwriter.utility
+                    col_letter = xlsxwriter.utility.xl_col_to_name(idx)
+                    num_format = "0" if col == "Total Critical Samples" else "0.00"
+                    ws1.write_formula(
+                        total_row_1, idx,
+                        f"=SUM({col_letter}2:{col_letter}{total_row_1})",
+                        writer.book.add_format({"num_format": num_format})
+                    )
+                except ValueError:
+                    logger.warning(f"Column '{col}' not found or caused error in Excel export.")",
                     writer.book.add_format({"num_format": num_format})
                 )
 
