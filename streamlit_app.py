@@ -130,6 +130,10 @@ else:
     st.error("No networks available. Please check your credentials or API connectivity.")
     st.stop()
 
+# Add Band Selector
+band_options = ["2.4GHz", "5GHz", "6GHz"]
+selected_bands = st.multiselect("Select Bands", options=band_options, default=band_options)
+
 eastern = pytz.timezone("US/Eastern")
 now_et = datetime.now(eastern)
 def_start = now_et - timedelta(days=7)
@@ -209,33 +213,35 @@ if st.button("Generate Report!"):
             return r if r.status_code == 200 else None
         except: return None
 
-    def get_kpi_data(sa, net, code):
+    def get_kpi_data(sa, net, code, band):
         local_results = []
+        band_map = {"2.4GHz": "2.4", "5GHz": "5", "6GHz": "6"}
+        band_id = band_map[band]
         for f, t in windows:
             f_ts, t_ts = int(f.timestamp()*1000), int(t.timestamp()*1000)
-            url = f"https://api-v2.7signal.com/kpis/sensors/service-areas/{sa['id']}?kpiCodes={code}&from={f_ts}&to={t_ts}&networkId={net['id']}&averaging=ALL"
+            url = f"https://api-v2.7signal.com/kpis/sensors/service-areas/{sa['id']}?kpiCodes={code}&from={f_ts}&to={t_ts}&networkId={net['id']}&band={band_id}&averaging=ALL"
             r = safe_get(url)
             if not r: continue
             for result in r.json().get("results", []):
-                for band in ["measurements24GHz", "measurements5GHz", "measurements6GHz"]:
-                    for m in result.get(band, []):
-                        samples = m.get("samples", 0)
-                        sla = m.get("slaValue", 0)
-                        crit_samp = round(samples * (1 - sla / 100), 2)
-                        local_results.append({
-                            "Service Area": sa["name"],
-                            "Network": net["name"],
-                            "Band": {"measurements24GHz": "2.4GHz", "measurements5GHz": "5GHz", "measurements6GHz": "6GHz"}[band],
-                            "Samples": samples,
-                            "Critical Samples": crit_samp,
-                            "KPI Name": result.get("name"),
-                            "SLA Value": sla
-                        })
+                band_key = {"2.4GHz": "measurements24GHz", "5GHz": "measurements5GHz", "6GHz": "measurements6GHz"}[band]
+                for m in result.get(band_key, []):
+                    samples = m.get("samples", 0)
+                    sla = m.get("slaValue", 0)
+                    crit_samp = round(samples * (1 - sla / 100), 2)
+                    local_results.append({
+                        "Service Area": sa["name"],
+                        "Network": net["name"],
+                        "Band": band,
+                        "Samples": samples,
+                        "Critical Samples": crit_samp,
+                        "KPI Name": result.get("name"),
+                        "SLA Value": sla
+                    })
         return local_results
 
     results = []
     with ThreadPoolExecutor(max_workers=3) as ex:
-        futures = [ex.submit(get_kpi_data, sa, net, code) for sa in service_areas for net in networks for code in kpi_codes]
+        futures = [ex.submit(get_kpi_data, sa, net, code, band) for sa in service_areas for net in networks for code in kpi_codes for band in selected_bands]
         for f in as_completed(futures):
             results.extend(f.result())
 
@@ -247,14 +253,11 @@ if st.button("Generate Report!"):
     df["SLA Value"] = df["SLA Value"].round(4)  # Leave as decimal so Excel percent format works properly
     df["SLA Value"] = df["SLA Value"].astype(float)  # ensure type is float for Excel formatting
 
-    # ... (previous code remains unchanged until pivot_kpi creation)
-
     pivot_kpi = df.pivot_table(index=["Service Area", "Network", "Band"], columns="KPI Name", values="SLA Value", aggfunc="mean").reset_index()
-    
-    # Convert SLA columns (KPI names) to decimals
+    # Convert SLA columns to decimals
     sla_columns = [col for col in pivot_kpi.columns if col not in ["Service Area", "Network", "Band"]]
     pivot_kpi[sla_columns] = pivot_kpi[sla_columns] / 100  # Convert percentage to decimal
-    
+
     summary = df.groupby(["Service Area", "Network", "Band"]).agg({
         "Samples": "sum",
         "Critical Samples": "sum"
@@ -263,13 +266,11 @@ if st.button("Generate Report!"):
     summary["Total Critical Samples"] = summary["Critical Samples"].round(0).astype(int)
     summary["Sampling Rate (samples/hr)"] = summary["Samples"] / (days_back * bh_per_day)
     summary["Avg Critical Hours Per Day"] = (summary["Critical Samples"] / summary["Samples"]) * bh_per_day
-    
+
     pivot = pivot_kpi.merge(summary.drop(columns=["Samples", "Critical Samples"]), on=["Service Area", "Network", "Band"])
     numeric_cols = pivot.select_dtypes(include="number").columns.tolist()
     cols_to_round_2 = [col for col in numeric_cols if col != "Total Critical Samples"]
     pivot[cols_to_round_2] = pivot[cols_to_round_2].round(2)
-
-# ... (rest of the code remains unchanged)
 
     # ====== CLIENT SUMMARY REPORT ======
     client_rows = []
