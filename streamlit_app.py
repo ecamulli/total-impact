@@ -37,16 +37,18 @@ def generate_excel_report(df, pivot, client_df, summary_client_df, days_back, se
         ws1 = writer.sheets["Summary Sensor Report"]
         total_row_1 = len(pivot) + 1
         ws1.write(total_row_1, 0, "Total")
-        # Add total formulas for KPI Name columns, Total Samples, Total Critical Samples, and Avg Critical Hours Per Day
-        total_columns = [col for col in pivot.columns if col not in ["Service Area", "Network", "Band"]]
-        for idx, col in enumerate(total_columns, start=3):  # Start after Service Area, Network, Band
-            col_letter = chr(ord('A') + idx)
-            num_format = "0" if col == "Total Critical Samples" else "0.00"
-            ws1.write_formula(
-                total_row_1, idx,
-                f"=SUM({col_letter}2:{col_letter}{total_row_1})",
-                writer.book.add_format({"num_format": num_format})
-            )
+        # Add total formulas only for Total Samples, Total Critical Samples, and Avg Critical Hours Per Day
+        columns_to_sum = ["Total Samples", "Total Critical Samples", "Avg Critical Hours Per Day"]
+        for col in columns_to_sum:
+            if col in pivot.columns:
+                idx = pivot.columns.get_loc(col)
+                col_letter = chr(ord('A') + idx)
+                num_format = "0" if col == "Total Critical Samples" else "0.00"
+                ws1.write_formula(
+                    total_row_1, idx,
+                    f"=SUM({col_letter}2:{col_letter}{total_row_1})",
+                    writer.book.add_format({"num_format": num_format})
+                )
         if not client_df.empty:
             client_df.to_excel(writer, sheet_name="Detailed Client Report", index=False)
         if not summary_client_df.empty:
