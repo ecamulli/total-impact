@@ -242,7 +242,11 @@ if st.button("Generate Report!"):
         st.warning("No KPI data found")
         st.stop()
 
-    df["SLA Value"] = df["SLA Value"].round(4)
+    df["SLA Value"] = df["SLA Value"].round(4)  # Leave as decimal so Excel percent format works properly
+    df["SLA Value"] = df["SLA Value"].astype(float)"  // ensure type is float for Excel formatting
+    }
+  ]
+}
     pivot_kpi = df.pivot_table(index=["Service Area", "Network", "Band"], columns="KPI Name", values="SLA Value", aggfunc="first").reset_index()
     summary = df.groupby(["Service Area", "Network", "Band"]).agg({
         "Samples": "sum",
