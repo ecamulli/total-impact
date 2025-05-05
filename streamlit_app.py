@@ -9,7 +9,7 @@ import uuid
 import logging
 
 # ========== CONFIG ==========
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", filename="impact_report.log")
+logging.basicBasic(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", filename="impact_report.log")
 logger = logging.getLogger(__name__)
 
 # Suppress console logging
@@ -277,7 +277,19 @@ def get_kpi_data(headers, sa, net, code, time_windows, days_back):
                 results.append({
                     "Service Area": sa["name"],
                     "Network": net["name"],
-                    "Band
+                    "Band": {"measurements24GHz": "2.4GHz", "measurements5GHz": "5GHz", "measurements6GHz": "6GHz"}[band],
+                    "Days Back": days_back,
+                    "KPI Code": kpi_code,
+                    "KPI Name": kpi_name,
+                    "Samples": total_samples,
+                    "SLA Value": total_sla,
+                    "KPI Value": total_kpi_value,
+                    "Status": status,
+                    "Target Value": target_value,
+                    "Critical Samples": crit_samp,
+                    "Critical Hours Per Day": round(min(crit_mins / 60 / days_back, business_hours_per_day), 2)
+                })
+    return results
 
 if st.button("Generate Report!"):
     if not all([account_name, client_id, client_secret, kpi_codes_input, selected_networks]):
