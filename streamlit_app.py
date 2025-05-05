@@ -249,7 +249,7 @@ if st.button("Generate Report!"):
     summary["Avg Critical Hours Per Day"] = (summary["Critical Samples"] / summary["Samples"]) * bh_per_day
     # Removed rename to avoid duplicate columns
 
-    pivot = pivot_kpi.merge(summary, on=["Service Area", "Network", "Band"])
+    pivot = pivot_kpi.merge(summary.drop(columns=["Samples", "Critical Samples"]), on=["Service Area", "Network", "Band"])
     pivot = pivot.round(2).fillna(0)
 
         # ====== CLIENT SUMMARY REPORT ======
