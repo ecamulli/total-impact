@@ -35,7 +35,8 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
         for col in ["Total Samples", "Total Critical Samples", "Avg Critical Hours Per Day"]:
             if col in pivot.columns:
                 idx = pivot.columns.get_loc(col)
-                col_letter = chr(ord('A') + idx)
+                import xlsxwriter.utility
+                col_letter = xlsxwriter.utility.xl_col_to_name(idx)
                 num_format = "0" if col == "Total Critical Samples" else "0.00"
                 ws1.write_formula(
                     total_row_1, idx,
