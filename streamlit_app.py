@@ -246,7 +246,19 @@ if st.button("Generate Report!"):
         st.stop()
 
     pivot_kpi = df.pivot_table(index=["Service Area", "Network", "Band"], columns="KPI Name", values="KPI Value", aggfunc="mean").reset_index()
-    pivot_crit = df.groupby(["Service Area", "Network", "Band"])["Critical Hours Per Day"].mean().reset_index().rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per Day"})
+    pivot_crit = df.groupby(["Service Area", "Network", "Band"]).agg({
+    "Samples": "sum",
+    "Critical Samples": "sum",
+    "Critical Hours Per Day": "mean"
+}).reset_index()
+
+pivot_crit["Total Hours of Poor Performance"] = (pivot_crit["Critical Samples"] / pivot_crit["Samples"]) * (bh_per_day * days_back)
+
+pivot_crit = pivot_crit.rename(columns={
+    "Samples": "Total Samples",
+    "Critical Samples": "Total Critical Samples",
+    "Critical Hours Per Day": "Avg Critical Hours Per Day"
+})
     pivot_samp = df.groupby(["Service Area", "Network", "Band"])["Samples"].sum().reset_index().rename(columns={"Samples": "Total Samples"})
     pivot_crit_samp = df.groupby(["Service Area", "Network", "Band"])["Critical Samples"].sum().reset_index().rename(columns={"Critical Samples": "Total Critical Samples"})
 
@@ -272,19 +284,19 @@ if st.button("Generate Report!"):
                         "Critical Hours Per Day": round(min((t.get("criticalSum") or 0) / 60 / days_back, bh_per_day), 2)
                     })
 
+    if rows:
     client_df = pd.DataFrame(rows)
-    if not client_df.empty:
-        summary_client_df = client_df.pivot_table(index='Location', columns='Type', values='Critical Hours Per Day', aggfunc='mean').reset_index()
-        avg_clients = client_df.groupby("Location")["Client Count"].mean().round(0).reset_index()
-        summary_client_df = summary_client_df.merge(avg_clients, on="Location")
-        summary_client_df.insert(1, 'Days Back', round(days_back, 2))
-        type_cols = [c for c in summary_client_df.columns if c not in ['Location', 'Client Count', 'Days Back']]
-        summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
-        summary_client_df['Avg Critical Hours Per Day'] = summary_client_df[type_cols].mean(axis=1).round(2)
-        summary_client_df = summary_client_df.sort_values(by='Avg Critical Hours Per Day', ascending=False)
-    else:
-        summary_client_df = pd.DataFrame()
+    summary_client_df = client_df.pivot_table(index='Location', columns='Type', values='Critical Hours Per Day', aggfunc='mean').reset_index()
+    avg_clients = client_df.groupby("Location")["Client Count"].mean().round(0).reset_index()
+    summary_client_df = summary_client_df.merge(avg_clients, on="Location")
+    summary_client_df.insert(1, 'Days Back', round(days_back, 2))
+    type_cols = [c for c in summary_client_df.columns if c not in ['Location', 'Client Count', 'Days Back']]
+    summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
+    summary_client_df['Avg Critical Hours Per Day'] = summary_client_df[type_cols].mean(axis=1).round(2)
+    summary_client_df = summary_client_df.sort_values(by='Avg Critical Hours Per Day', ascending=False)
+else:
+    summary_client_df = pd.DataFrame()
 
-    excel_data = generate_excel_report(pivot, summary_client_df, days_back, selected_days, business_start, business_end)
+    excel_data = generate_excel_report(days_back, selected_days, business_start, business_end)
     file_name = f"{account_name}_impact_report_{from_dt.date()}_to_{to_dt.date()}_business_hours.xlsx"
     st.download_button("Download Excel Report", data=excel_data, file_name=file_name, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") you'd like me to drop in the rest of the script logic here.
