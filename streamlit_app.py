@@ -45,7 +45,7 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
                         writer.book.add_format({"num_format": num_format})
                     )
                 except ValueError:
-                    logger.warning(f"Column '{col}' not found or caused error in Excel export.")",
+                    logger.warning(f"Column '{col}' not found or caused error in Excel export.")
                     writer.book.add_format({"num_format": num_format})
                 )
 
