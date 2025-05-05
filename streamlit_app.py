@@ -32,7 +32,7 @@ def generate_excel_report(df, pivot, client_df, summary_client_df, days_back, se
         })
         metadata.to_excel(writer, sheet_name="Report Info", index=False)
         
-        df.to_excel(writer, sheet_name="Detailed Sensor Report", index=False)
+       
         pivot.to_excel(writer, sheet_name="Summary Sensor Report", index=False)
         ws1 = writer.sheets["Summary Sensor Report"]
         total_row_1 = len(pivot) + 1
@@ -66,7 +66,6 @@ def generate_excel_report(df, pivot, client_df, summary_client_df, days_back, se
                 )
         for sheet_name, data in {
             "Report Info": metadata,
-            "Detailed Sensor Report": df,
             "Summary Sensor Report": pivot,
             "Detailed Client Report": client_df,
             "Summary Client Report": summary_client_df
