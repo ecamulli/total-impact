@@ -247,7 +247,7 @@ if st.button("Generate Report!"):
     summary["Total Critical Samples"] = summary["Critical Samples"].round(0).astype(int)
     summary["Sampling Rate (samples/hr)"] = summary["Samples"] / (days_back * bh_per_day)
     summary["Avg Critical Hours Per Day"] = (summary["Critical Samples"] / summary["Samples"]) * bh_per_day
-    summary = summary.rename(columns={"Samples": "Total Samples", "Critical Samples": "Total Critical Samples"})
+    # Removed rename to avoid duplicate columns
 
     pivot = pivot_kpi.merge(summary, on=["Service Area", "Network", "Band"])
     pivot = pivot.round(2).fillna(0)
@@ -274,7 +274,7 @@ if st.button("Generate Report!"):
         summary_client_df = summary_client_df.merge(client_counts, on="Location", how="left")
         summary_client_df.insert(1, 'Client Count', summary_client_df.pop('Client Count'))
         summary_client_df.insert(1, 'Days Back', round(days_back, 2))
-        type_cols = [c for c in summary_client_df.columns if c not in ['Location', 'Days Back']]
+        type_cols = [c for c in summary_client_df.columns if c not in ['Location', 'Days Back', 'Client Count']]
         summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
         summary_client_df['Avg Critical Hours Per Day'] = summary_client_df[type_cols].mean(axis=1).round(2)
         summary_client_df = summary_client_df.sort_values(by='Avg Critical Hours Per Day', ascending=False)
