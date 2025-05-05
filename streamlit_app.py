@@ -325,7 +325,23 @@ if st.button("Generate Report!"):
         st.warning(f"No KPI data found for {kpi_codes_input}. Try different codes or networks.")
         st.stop()
 
+    # Create initial DataFrame from results
     df = pd.DataFrame(results)
+
+    # Aggregate df to ensure one row per Service Area-Network-Band
+    df_agg = df.groupby(["Service Area", "Network", "Band"]).agg({
+        "Samples": "sum",
+        "Critical Samples": "sum",
+        "Critical Hours Per Day": "mean",
+        "SLA Value": "mean",
+        "KPI Value": "mean",  # Will be pivoted later by KPI Name
+        "Days Back": "first",
+        "KPI Code": lambda x: ", ".join(sorted(set(x))),  # Combine KPI Codes for reference
+        "KPI Name": lambda x: ", ".join(sorted(set(x))),  # Combine KPI Names for reference
+        "Status": "first",
+        "Target Value": "first"
+    }).reset_index()
+
     # Create pivot table for KPI Values
     pivot_kpi = (
         df.pivot_table(
@@ -338,24 +354,18 @@ if st.button("Generate Report!"):
     )
     # Create pivot table for Avg Critical Hours Per Day
     pivot_critical = (
-        df.groupby(["Service Area", "Network", "Band"])["Critical Hours Per Day"]
-        .mean()
-        .reset_index()
+        df_agg[["Service Area", "Network", "Band", "Critical Hours Per Day"]]
         .rename(columns={"Critical Hours Per Day": "Avg Critical Hours Per Day"})
     )
     # Create pivot table for Total Samples
     pivot_samples = (
-        df.groupby(["Service Area", "Network", "Band"])["Samples"]
-        .sum()
-        .reset_index()
+        df_agg[["Service Area", "Network", "Band", "Samples"]]
         .rename(columns={"Samples": "Total Samples"})
     )
     # Create pivot table for Total Critical Samples
     pivot_critical_samples = (
-        df.groupby(["Service Area", "Network", "Band"])["Critical Samples"]
-        .sum()
+        df_agg[["Service Area", "Network", "Band", "Critical Samples"]]
         .round(0)  # Round to whole number
-        .reset_index()
         .rename(columns={"Critical Samples": "Total Critical Samples"})
     )
     # Merge all pivot tables, ensuring Avg Critical Hours Per Day is at the end
