@@ -242,7 +242,7 @@ if st.button("Generate Report!"):
         st.warning("No KPI data found")
         st.stop()
 
-    df["SLA Value"] = df["SLA Value"].round(2).astype(str) + "%"
+    df["SLA Value"] = (df["SLA Value"] * 100).round(2)
     pivot_kpi = df.pivot_table(index=["Service Area", "Network", "Band"], columns="KPI Name", values="SLA Value", aggfunc="first").reset_index()
     summary = df.groupby(["Service Area", "Network", "Band"]).agg({
         "Samples": "sum",
