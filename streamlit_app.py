@@ -247,8 +247,14 @@ if st.button("Generate Report!"):
     df["SLA Value"] = df["SLA Value"].round(4)  # Leave as decimal so Excel percent format works properly
     df["SLA Value"] = df["SLA Value"].astype(float)  # ensure type is float for Excel formatting
 
-    pivot_kpi = df.pivot_table(index=["Service Area", "Network", "Band"], columns="KPI Name", values="SLA Value", aggfunc="mean").reset_index()
+    # ... (previous code remains unchanged until pivot_kpi creation)
 
+    pivot_kpi = df.pivot_table(index=["Service Area", "Network", "Band"], columns="KPI Name", values="SLA Value", aggfunc="mean").reset_index()
+    
+    # Convert SLA columns (KPI names) to decimals
+    sla_columns = [col for col in pivot_kpi.columns if col not in ["Service Area", "Network", "Band"]]
+    pivot_kpi[sla_columns] = pivot_kpi[sla_columns] / 100  # Convert percentage to decimal
+    
     summary = df.groupby(["Service Area", "Network", "Band"]).agg({
         "Samples": "sum",
         "Critical Samples": "sum"
@@ -257,11 +263,13 @@ if st.button("Generate Report!"):
     summary["Total Critical Samples"] = summary["Critical Samples"].round(0).astype(int)
     summary["Sampling Rate (samples/hr)"] = summary["Samples"] / (days_back * bh_per_day)
     summary["Avg Critical Hours Per Day"] = (summary["Critical Samples"] / summary["Samples"]) * bh_per_day
-
+    
     pivot = pivot_kpi.merge(summary.drop(columns=["Samples", "Critical Samples"]), on=["Service Area", "Network", "Band"])
     numeric_cols = pivot.select_dtypes(include="number").columns.tolist()
     cols_to_round_2 = [col for col in numeric_cols if col != "Total Critical Samples"]
     pivot[cols_to_round_2] = pivot[cols_to_round_2].round(2)
+
+# ... (rest of the code remains unchanged)
 
     # ====== CLIENT SUMMARY REPORT ======
     client_rows = []
