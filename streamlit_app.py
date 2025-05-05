@@ -246,7 +246,31 @@ if st.button("Generate Report!"):
     pivot = pivot_kpi.merge(summary, on=["Service Area", "Network", "Band"])
     pivot = pivot.round(2).fillna(0)
 
-    summary_client_df = pd.DataFrame()
+        # ====== CLIENT SUMMARY REPORT ======
+    client_rows = []
+    for f, t in windows:
+        f_ts, t_ts = int(f.timestamp()*1000), int(t.timestamp()*1000)
+        client_url = f"https://api-v2.7signal.com/kpis/agents/locations?from={f_ts}&to={t_ts}&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE&includeClientCount=true"
+        r = safe_get(client_url)
+        if r:
+            for loc in r.json().get("results", []):
+                for t in loc.get("types", []):
+                    client_rows.append({
+                        "Location": loc.get("locationName"),
+                        "Type": t.get("type").replace("_", " ").title(),
+                        "Critical Hours Per Day": round((t.get("criticalSum") or 0) / 60 / days_back, 2)
+                    })
+
+    if client_rows:
+        client_df = pd.DataFrame(client_rows)
+        summary_client_df = client_df.pivot_table(index="Location", columns="Type", values="Critical Hours Per Day", aggfunc="mean").reset_index()
+        summary_client_df.insert(1, 'Days Back', round(days_back, 2))
+        type_cols = [c for c in summary_client_df.columns if c not in ['Location', 'Days Back']]
+        summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
+        summary_client_df['Avg Critical Hours Per Day'] = summary_client_df[type_cols].mean(axis=1).round(2)
+        summary_client_df = summary_client_df.sort_values(by='Avg Critical Hours Per Day', ascending=False)
+    else:
+        summary_client_df = pd.DataFrame()
     excel_data = generate_excel_report(pivot, summary_client_df, days_back, selected_days, business_start, business_end)
     file_name = f"{account_name}_impact_report_{from_dt.date()}_to_{to_dt.date()}_business_hours.xlsx"
     st.download_button("Download Excel Report", data=excel_data, file_name=file_name, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
