@@ -244,3 +244,7 @@ if st.button("Generate Report!"):
 
     df["SLA Value"] = df["SLA Value"].round(4)  # Leave as decimal so Excel percent format works properly
     df["SLA Value"] = df["SLA Value"].astype(float)  # ensure type is float for Excel formatting
+
+    excel_data = generate_excel_report(pivot, summary_client_df, days_back, selected_days, business_start, business_end)
+    file_name = f"{account_name}_impact_report_{from_dt.date()}_to_{to_dt.date()}_business_hours.xlsx"
+    st.download_button("Download Excel Report", data=excel_data, file_name=file_name, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
