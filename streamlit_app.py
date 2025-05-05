@@ -69,7 +69,9 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
             if not data.empty:
                 worksheet = writer.sheets[sheet_name]
                 for i, col in enumerate(data.columns):
-                    if col in pivot.columns and col not in ["Total Samples", "Total Critical Samples", "Sampling Rate (samples/hr)", "Avg Critical Hours Per Day"]:
+                    if col in pivot.columns and col.startswith("SLA"):
+                        worksheet.set_column(i, i, 23, writer.book.add_format({"num_format": "0.00"}))
+                    elif col in pivot.columns and col not in ["Total Samples", "Total Critical Samples", "Sampling Rate (samples/hr)", "Avg Critical Hours Per Day"]:
                         worksheet.set_column(i, i, 23, writer.book.add_format({"num_format": "0.00%"}))
                     else:
                         worksheet.set_column(i, i, 23)
@@ -261,7 +263,34 @@ if st.button("Generate Report!"):
     cols_to_round_2 = [col for col in numeric_cols if col != "Total Critical Samples"]
     pivot[cols_to_round_2] = pivot[cols_to_round_2].round(2)
 
-    summary_client_df = pd.DataFrame()
+    # ====== CLIENT SUMMARY REPORT ======
+    client_rows = []
+    for f, t in windows:
+        f_ts, t_ts = int(f.timestamp()*1000), int(t.timestamp()*1000)
+        client_url = f"https://api-v2.7signal.com/kpis/agents/locations?from={f_ts}&to={t_ts}&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE&includeClientCount=true"
+        r = safe_get(client_url)
+        if r:
+            for loc in r.json().get("results", []):
+                for t in loc.get("types", []):
+                    client_rows.append({
+                        "Location": loc.get("locationName"),
+                        "Type": t.get("type").replace("_", " ").title(),
+                        "Critical Hours Per Day": round((t.get("criticalSum") or 0) / 60 / days_back, 2)
+                    })
+
+    if client_rows:
+        client_df = pd.DataFrame(client_rows)
+        summary_client_df = client_df.pivot_table(index="Location", columns="Type", values="Critical Hours Per Day", aggfunc="mean").reset_index()
+        client_counts = client_df.groupby("Location")["Critical Hours Per Day"].count().reset_index(name="Client Count")
+        summary_client_df = summary_client_df.merge(client_counts, on="Location", how="left")
+        summary_client_df.insert(1, 'Client Count', summary_client_df.pop('Client Count'))
+        summary_client_df.insert(2, 'Days Back', round(days_back, 2))
+        type_cols = [c for c in summary_client_df.columns if c not in ['Location', 'Client Count', 'Days Back']]
+        summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
+        summary_client_df['Avg Critical Hours Per Day'] = summary_client_df[type_cols].mean(axis=1).round(2)
+        summary_client_df = summary_client_df.sort_values(by='Avg Critical Hours Per Day', ascending=False)
+    else:
+        summary_client_df = pd.DataFrame()
 
     excel_data = generate_excel_report(pivot, summary_client_df, days_back, selected_days, business_start, business_end)
     file_name = f"{account_name}_impact_report_{from_dt.date()}_to_{to_dt.date()}_business_hours.xlsx"
