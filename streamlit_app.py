@@ -69,7 +69,10 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
             if not data.empty:
                 worksheet = writer.sheets[sheet_name]
                 for i, col in enumerate(data.columns):
-                    worksheet.set_column(i, i, 23)
+                    if col in pivot.columns and col not in ["Total Samples", "Total Critical Samples", "Sampling Rate (samples/hr)", "Avg Critical Hours Per Day"]:
+                        worksheet.set_column(i, i, 23, writer.book.add_format({"num_format": "0.00%"}))
+                    else:
+                        worksheet.set_column(i, i, 23)
     output.seek(0)
     return output
 
