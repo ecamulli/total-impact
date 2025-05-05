@@ -223,7 +223,7 @@ if st.button("Generate Report!"):
                             "Band": {"measurements24GHz": "2.4GHz", "measurements5GHz": "5GHz", "measurements6GHz": "6GHz"}[band],
                             "Samples": samples,
                             "Critical Samples": crit_samp,
-                            "KPI Name": result.get("name")
+                            "KPI Name": f"{result.get('name')} (SLA: {sla}%)"
                         })
         return local_results
 
