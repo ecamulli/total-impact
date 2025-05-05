@@ -259,29 +259,25 @@ def get_kpi_data(headers, sa, net, code, time_windows, days_back):
         if not r:
             continue
         for result in r.json().get("results", []):
+            kpi_code = result.get("kpiCode")
+            kpi_name = result.get("name")
             for band in ["measurements24GHz", "measurements5GHz", "measurements6GHz"]:
-                for m in result.get(band, []):
-                    samples = m.get("samples") or 0
-                    sla = m.get("slaValue") or 0
-                    total_mins = (to_ts - from_ts) / 1000 / 60
-                    crit_samp = round(samples * (1 - sla / 100), 2)
-                    crit_mins = crit_samp * (total_mins / samples) if samples else 0
-                    results.append({
-                        "Service Area": sa["name"],
-                        "Network": net["name"],
-                        "Band": {"measurements24GHz": "2.4GHz", "measurements5GHz": "5GHz", "measurements6GHz": "6GHz"}[band],
-                        "Days Back": days_back,
-                        "KPI Code": result.get("kpiCode"),
-                        "KPI Name": result.get("name"),
-                        "Samples": samples,
-                        "SLA Value": sla,
-                        "KPI Value": m.get("kpiValue"),
-                        "Status": m.get("status"),
-                        "Target Value": m.get("targetValue"),
-                        "Critical Samples": crit_samp,
-                        "Critical Hours Per Day": round(min(crit_mins / 60 / days_back, business_hours_per_day), 2)
-                    })
-    return results
+                measurements = result.get(band, [])
+                if not measurements:
+                    continue
+                # Aggregate measurements for this band
+                total_samples = sum(m.get("samples", 0) for m in measurements)
+                total_sla = sum(m.get("slaValue", 0) for m in measurements) / len(measurements) if measurements else 0
+                total_kpi_value = sum(m.get("kpiValue", 0) for m in measurements) / len(measurements) if measurements else 0
+                status = measurements[0].get("status") if measurements else None
+                target_value = measurements[0].get("targetValue") if measurements else None
+                total_mins = (to_ts - from_ts) / 1000 / 60
+                crit_samp = round(total_samples * (1 - total_sla / 100), 2)
+                crit_mins = crit_samp * (total_mins / total_samples) if total_samples else 0
+                results.append({
+                    "Service Area": sa["name"],
+                    "Network": net["name"],
+                    "Band
 
 if st.button("Generate Report!"):
     if not all([account_name, client_id, client_secret, kpi_codes_input, selected_networks]):
