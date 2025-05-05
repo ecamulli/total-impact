@@ -9,7 +9,7 @@ import uuid
 import logging
 
 # ========== CONFIG ==========
-logging.basicBasic(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", filename="impact_report.log")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", filename="impact_report.log")
 logger = logging.getLogger(__name__)
 
 # Suppress console logging
