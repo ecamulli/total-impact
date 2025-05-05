@@ -223,7 +223,8 @@ if st.button("Generate Report!"):
                             "Band": {"measurements24GHz": "2.4GHz", "measurements5GHz": "5GHz", "measurements6GHz": "6GHz"}[band],
                             "Samples": samples,
                             "Critical Samples": crit_samp,
-                            "KPI Name": f"SLA: {sla}%"
+                            "KPI Name": result.get("name"),
+                            "SLA Value": sla
                         })
         return local_results
 
@@ -238,7 +239,7 @@ if st.button("Generate Report!"):
         st.warning("No KPI data found")
         st.stop()
 
-    pivot_kpi = df.pivot_table(index=["Service Area", "Network", "Band"], columns="KPI Name", values="Samples", aggfunc="mean").reset_index()
+    pivot_kpi = df.pivot_table(index=["Service Area", "Network", "Band"], columns="KPI Name", values="SLA Value", aggfunc="mean").reset_index()
     summary = df.groupby(["Service Area", "Network", "Band"]).agg({
         "Samples": "sum",
         "Critical Samples": "sum"
