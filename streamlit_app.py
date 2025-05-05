@@ -250,7 +250,9 @@ if st.button("Generate Report!"):
     # Removed rename to avoid duplicate columns
 
     pivot = pivot_kpi.merge(summary.drop(columns=["Samples", "Critical Samples"]), on=["Service Area", "Network", "Band"])
-    pivot = pivot.round(2).fillna(0)
+    numeric_cols = pivot.select_dtypes(include="number").columns.tolist()
+    cols_to_round_2 = [col for col in numeric_cols if col != "Total Critical Samples"]
+    pivot[cols_to_round_2] = pivot[cols_to_round_2].round(2)
 
         # ====== CLIENT SUMMARY REPORT ======
     client_rows = []
