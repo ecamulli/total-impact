@@ -239,6 +239,8 @@ if st.button("Generate Report!"):
         "Samples": "sum",
         "Critical Samples": "sum"
     }).reset_index()
+    summary["Total Samples"] = summary["Samples"].round(2)
+    summary["Total Critical Samples"] = summary["Critical Samples"].round(0).astype(int)
     summary["Sampling Rate (samples/hr)"] = summary["Samples"] / (days_back * bh_per_day)
     summary["Avg Critical Hours Per Day"] = (summary["Critical Samples"] / summary["Samples"]) * bh_per_day
     summary = summary.rename(columns={"Samples": "Total Samples", "Critical Samples": "Total Critical Samples"})
@@ -263,7 +265,10 @@ if st.button("Generate Report!"):
 
     if client_rows:
         client_df = pd.DataFrame(client_rows)
-        summary_client_df = client_df.pivot_table(index="Location", columns="Type", values="Critical Hours Per Day", aggfunc="mean").reset_index()
+        summary_client_df = client_df.pivot_table(index=["Location"], columns="Type", values="Critical Hours Per Day", aggfunc="mean").reset_index()
+        client_counts = client_df.groupby("Location")["Critical Hours Per Day"].count().reset_index(name="Client Count")
+        summary_client_df = summary_client_df.merge(client_counts, on="Location", how="left")
+        summary_client_df.insert(1, 'Client Count', summary_client_df.pop('Client Count'))
         summary_client_df.insert(1, 'Days Back', round(days_back, 2))
         type_cols = [c for c in summary_client_df.columns if c not in ['Location', 'Days Back']]
         summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
