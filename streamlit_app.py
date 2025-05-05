@@ -5,14 +5,11 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pytz
-import uuid
 import logging
 
 # ========== CONFIG ==========
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", filename="impact_report.log")
 logger = logging.getLogger(__name__)
-
-# Suppress console logging
 logger.handlers = [h for h in logger.handlers if not isinstance(h, logging.StreamHandler)]
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.CRITICAL)
@@ -35,8 +32,7 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
         ws1 = writer.sheets["Summary Sensor Report"]
         total_row_1 = len(pivot) + 1
         ws1.write(total_row_1, 0, "Total")
-        columns_to_sum = ["Total Samples", "Total Critical Samples", "Avg Critical Hours Per Day"]
-        for col in columns_to_sum:
+        for col in ["Total Samples", "Total Critical Samples", "Avg Critical Hours Per Day"]:
             if col in pivot.columns:
                 idx = pivot.columns.get_loc(col)
                 col_letter = chr(ord('A') + idx)
@@ -73,6 +69,7 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
     output.seek(0)
     return output
 
+# ========== UI SETUP ==========
 st.set_page_config(page_title="7SIGNAL Total Impact Report")
 st.title("📊 7SIGNAL Total Impact Report")
 
@@ -119,11 +116,7 @@ else:
     st.stop()
 
 if st.session_state.networks:
-    selected_networks = st.multiselect(
-        "Select Networks",
-        options=st.session_state.networks,
-        default=st.session_state.networks
-    )
+    selected_networks = st.multiselect("Select Networks", options=st.session_state.networks, default=st.session_state.networks)
 else:
     st.error("No networks available. Please check your credentials or API connectivity.")
     st.stop()
@@ -188,6 +181,7 @@ if days_back > 30:
 
 st.markdown(f"**{days_back:.2f} business days selected**")
 
+# ========== DATA PROCESSING ==========
 if st.button("Generate Report!"):
     token = authenticate(client_id, client_secret)
     if not token:
@@ -195,13 +189,11 @@ if st.button("Generate Report!"):
         st.stop()
 
     headers = {"Authorization": f"Bearer {token}"}
-    net_req = requests.get("https://api-v2.7signal.com/networks/sensors", headers=headers).json()
-    networks = [n for n in net_req.get("results", []) if n.get("name") in selected_networks]
-
     service_areas = requests.get("https://api-v2.7signal.com/topologies/sensors/serviceAreas", headers=headers).json().get("results", [])
-
+    all_networks = requests.get("https://api-v2.7signal.com/networks/sensors", headers=headers).json().get("results", [])
+    networks = [n for n in all_networks if n.get("name") in selected_networks]
     kpi_codes = [k.strip() for k in kpi_codes_input.split(",")][:4]
-    results = []
+
     def safe_get(url):
         try:
             r = requests.get(url, headers=headers, timeout=10)
@@ -221,20 +213,17 @@ if st.button("Generate Report!"):
                         samples = m.get("samples", 0)
                         sla = m.get("slaValue", 0)
                         crit_samp = round(samples * (1 - sla / 100), 2)
-                        total_mins = (t_ts - f_ts) / 1000 / 60
-                        crit_mins = crit_samp * (total_mins / samples) if samples else 0
                         local_results.append({
                             "Service Area": sa["name"],
                             "Network": net["name"],
                             "Band": {"measurements24GHz": "2.4GHz", "measurements5GHz": "5GHz", "measurements6GHz": "6GHz"}[band],
                             "Samples": samples,
                             "Critical Samples": crit_samp,
-                            "KPI Name": result.get("name"),
-                            "KPI Value": m.get("kpiValue"),
-                            "Critical Hours Per Day": round(min(crit_mins / 60 / days_back, bh_per_day), 2)
+                            "KPI Name": result.get("name")
                         })
         return local_results
 
+    results = []
     with ThreadPoolExecutor(max_workers=3) as ex:
         futures = [ex.submit(get_kpi_data, sa, net, code) for sa in service_areas for net in networks for code in kpi_codes]
         for f in as_completed(futures):
@@ -245,58 +234,18 @@ if st.button("Generate Report!"):
         st.warning("No KPI data found")
         st.stop()
 
-    pivot_kpi = df.pivot_table(index=["Service Area", "Network", "Band"], columns="KPI Name", values="KPI Value", aggfunc="mean").reset_index()
-    pivot_crit = df.groupby(["Service Area", "Network", "Band"]).agg({
-    "Samples": "sum",
-    "Critical Samples": "sum",
-    "Critical Hours Per Day": "mean"
-}).reset_index()
+    pivot_kpi = df.pivot_table(index=["Service Area", "Network", "Band"], columns="KPI Name", values="Samples", aggfunc="mean").reset_index()
+    summary = df.groupby(["Service Area", "Network", "Band"]).agg({
+        "Samples": "sum",
+        "Critical Samples": "sum"
+    }).reset_index()
+    summary["Avg Critical Hours Per Day"] = (summary["Critical Samples"] / summary["Samples"]) * bh_per_day
+    summary = summary.rename(columns={"Samples": "Total Samples", "Critical Samples": "Total Critical Samples"})
 
-pivot_crit["Total Hours of Poor Performance"] = (pivot_crit["Critical Samples"] / pivot_crit["Samples"]) * (bh_per_day * days_back)
-
-pivot_crit = pivot_crit.rename(columns={
-    "Samples": "Total Samples",
-    "Critical Samples": "Total Critical Samples",
-    "Critical Hours Per Day": "Avg Critical Hours Per Day"
-})
-    pivot_samp = df.groupby(["Service Area", "Network", "Band"])["Samples"].sum().reset_index().rename(columns={"Samples": "Total Samples"})
-    pivot_crit_samp = df.groupby(["Service Area", "Network", "Band"])["Critical Samples"].sum().reset_index().rename(columns={"Critical Samples": "Total Critical Samples"})
-
-    pivot = pivot_kpi.merge(pivot_samp, on=["Service Area", "Network", "Band"])
-    pivot = pivot.merge(pivot_crit_samp, on=["Service Area", "Network", "Band"])
-    pivot = pivot.merge(pivot_crit, on=["Service Area", "Network", "Band"])
+    pivot = pivot_kpi.merge(summary, on=["Service Area", "Network", "Band"])
     pivot = pivot.round(2).fillna(0)
-    pivot["Total Critical Samples"] = pivot["Total Critical Samples"].astype(int)
 
-    # Client Data
-    rows = []
-    for f, t in windows:
-        f_ts, t_ts = int(f.timestamp()*1000), int(t.timestamp()*1000)
-        url = f"https://api-v2.7signal.com/kpis/agents/locations?from={f_ts}&to={t_ts}&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE&includeClientCount=true"
-        r = safe_get(url)
-        if r:
-            for loc in r.json().get("results", []):
-                for t in loc.get("types", []):
-                    rows.append({
-                        "Location": loc.get("locationName"),
-                        "Client Count": loc.get("clientCount"),
-                        "Type": t.get("type").replace("_", " ").title(),
-                        "Critical Hours Per Day": round(min((t.get("criticalSum") or 0) / 60 / days_back, bh_per_day), 2)
-                    })
-
-    if rows:
-    client_df = pd.DataFrame(rows)
-    summary_client_df = client_df.pivot_table(index='Location', columns='Type', values='Critical Hours Per Day', aggfunc='mean').reset_index()
-    avg_clients = client_df.groupby("Location")["Client Count"].mean().round(0).reset_index()
-    summary_client_df = summary_client_df.merge(avg_clients, on="Location")
-    summary_client_df.insert(1, 'Days Back', round(days_back, 2))
-    type_cols = [c for c in summary_client_df.columns if c not in ['Location', 'Client Count', 'Days Back']]
-    summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
-    summary_client_df['Avg Critical Hours Per Day'] = summary_client_df[type_cols].mean(axis=1).round(2)
-    summary_client_df = summary_client_df.sort_values(by='Avg Critical Hours Per Day', ascending=False)
-else:
     summary_client_df = pd.DataFrame()
-
-    excel_data = generate_excel_report(days_back, selected_days, business_start, business_end)
+    excel_data = generate_excel_report(pivot, summary_client_df, days_back, selected_days, business_start, business_end)
     file_name = f"{account_name}_impact_report_{from_dt.date()}_to_{to_dt.date()}_business_hours.xlsx"
-    st.download_button("Download Excel Report", data=excel_data, file_name=file_name, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") you'd like me to drop in the rest of the script logic here.
+    st.download_button("Download Excel Report", data=excel_data, file_name=file_name, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
