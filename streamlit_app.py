@@ -48,7 +48,6 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
                     logger.warning(f"Column '{col}' not found or caused error in Excel export.")
 
         if not summary_client_df.empty:
-            summary_client_df.to        if not summary_client_df.empty:
             summary_client_df.to_excel(writer, sheet_name="Summary Client Report", index=False)
             ws2 = writer.sheets["Summary Client Report"]
             total_row_2 = len(summary_client_df) + 1
