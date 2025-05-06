@@ -48,6 +48,7 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
                     logger.warning(f"Column '{col}' not found or caused error in Excel export.")
 
         if not summary_client_df.empty:
+            summary_client_df.to        if not summary_client_df.empty:
             summary_client_df.to_excel(writer, sheet_name="Summary Client Report", index=False)
             ws2 = writer.sheets["Summary Client Report"]
             total_row_2 = len(summary_client_df) + 1
@@ -271,6 +272,9 @@ if st.button("Generate Report!"):
     numeric_cols = pivot.select_dtypes(include="number").columns.tolist()
     cols_to_round_2 = [col for col in numeric_cols if col != "Total Critical Samples"]
     pivot[cols_to_round_2] = pivot[cols_to_round_2].round(2)
+    
+    # Sort by Avg Critical Hours Per Day in descending order
+    pivot = pivot.sort_values(by="Avg Critical Hours Per Day", ascending=False).reset_index(drop=True)
 
     # ====== CLIENT SUMMARY REPORT ======
     client_rows = []
