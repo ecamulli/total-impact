@@ -205,7 +205,7 @@ if st.button("Generate Report!"):
     service_areas = requests.get("https://api-v2.7signal.com/topologies/sensors/serviceAreas", headers=headers).json().get("results", [])
     all_networks = requests.get("https://api-v2.7signal.com/networks/sensors", headers=headers).json().get("results", [])
     networks = [n for n in all_networks if n.get("name") in selected_networks]
-    kpi_codes = [k.strip() for k in kpi_codes_input.split(",")][:4]
+    kpi_codes = [k.strip() for k in kpi_codes_input.split(",") if k.strip()][:4] if kpi_codes_input.strip() else []
 
     def safe_get(url):
         try:
@@ -238,43 +238,44 @@ if st.button("Generate Report!"):
                         "SLA Value": sla
                     })
         return local_results
-
-    results = []
-    with ThreadPoolExecutor(max_workers=3) as ex:
-        futures = [ex.submit(get_kpi_data, sa, net, code, band) for sa in service_areas for net in networks for code in kpi_codes for band in selected_bands]
-        for f in as_completed(futures):
-            results.extend(f.result())
-
-    df = pd.DataFrame(results)
-    if df.empty:
-        st.warning("No KPI data found")
-        st.stop()
-
-    df["SLA Value"] = df["SLA Value"].round(4)  # Leave as decimal so Excel percent format works properly
-    df["SLA Value"] = df["SLA Value"].astype(float)  # ensure type is float for Excel formatting
-
-    pivot_kpi = df.pivot_table(index=["Service Area", "Network", "Band"], columns="KPI Name", values="SLA Value", aggfunc="mean").reset_index()
-    # Convert SLA columns to decimals
-    sla_columns = [col for col in pivot_kpi.columns if col not in ["Service Area", "Network", "Band"]]
-    pivot_kpi[sla_columns] = pivot_kpi[sla_columns] / 100  # Convert percentage to decimal
-
-    summary = df.groupby(["Service Area", "Network", "Band"]).agg({
-        "Samples": "sum",
-        "Critical Samples": "sum"
-    }).reset_index()
-    summary["Total Samples"] = summary["Samples"].round(2)
-    summary["Total Critical Samples"] = summary["Critical Samples"].round(0).astype(int)
-    summary["Sampling Rate (samples/hr)"] = summary["Samples"] / (days_back * bh_per_day)
-    summary["Avg Critical Hours Per Day"] = (summary["Critical Samples"] / summary["Samples"]) * bh_per_day
-
-    pivot = pivot_kpi.merge(summary.drop(columns=["Samples", "Critical Samples"]), on=["Service Area", "Network", "Band"])
-    numeric_cols = pivot.select_dtypes(include="number").columns.tolist()
-    cols_to_round_2 = [col for col in numeric_cols if col != "Total Critical Samples"]
-    pivot[cols_to_round_2] = pivot[cols_to_round_2].round(2)
     
-    # Sort by Avg Critical Hours Per Day in descending order
-    pivot = pivot.sort_values(by="Avg Critical Hours Per Day", ascending=False).reset_index(drop=True)
+    # Initialize pivot as empty DataFrame with expected columns
+    pivot = pd.DataFrame(columns=["Service Area", "Network", "Band", "Total Samples", "Total Critical Samples", "Sampling Rate (samples/hr)", "Avg Critical Hours Per Day"])
 
+    # Only process sensor data if kpi_codes is not empty
+    if kpi_codes:
+        results = []
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            futures = [ex.submit(get_kpi_data, sa, net, code, band) for sa in service_areas for net in networks for code in kpi_codes for band in selected_bands]
+            for f in as_completed(futures):
+                results.extend(f.result())
+    
+        df = pd.DataFrame(results)
+        if not df.empty:
+            df["SLA Value"] = df["SLA Value"].round(4)
+            df["SLA Value"] = df["SLA Value"].astype(float)
+    
+            pivot_kpi = df.pivot_table(index=["Service Area", "Network", "Band"], columns="KPI Name", values="SLA Value", aggfunc="mean").reset_index()
+            sla_columns = [col for col in pivot_kpi.columns if col not in ["Service Area", "Network", "Band"]]
+            pivot_kpi[sla_columns] = pivot_kpi[sla_columns] / 100
+    
+            summary = df.groupby(["Service Area", "Network", "Band"]).agg({
+                "Samples": "sum",
+                "Critical Samples": "sum"
+            }).reset_index()
+            summary["Total Samples"] = summary["Samples"].round(2)
+            summary["Total Critical Samples"] = summary["Critical Samples"].round(0).astype(int)
+            summary["Sampling Rate (samples/hr)"] = summary["Samples"] / (days_back * bh_per_day)
+            summary["Avg Critical Hours Per Day"] = (summary["Critical Samples"] / summary["Samples"]) * bh_per_day
+    
+            pivot = pivot_kpi.merge(summary.drop(columns=["Samples", "Critical Samples"]), on=["Service Area", "Network", "Band"])
+            numeric_cols = pivot.select_dtypes(include="number").columns.tolist()
+            cols_to_round_2 = [col for col in numeric_cols if col != "Total Critical Samples"]
+            pivot[cols_to_round_2] = pivot[cols_to_round_2].round(2)
+            pivot = pivot.sort_values(by="Avg Critical Hours Per Day", ascending=False).reset_index(drop=True)
+        else:
+            st.warning("No KPI data found for the provided codes.")
+        
     # ====== CLIENT SUMMARY REPORT ======
     client_rows = []
     for f, t in windows:
@@ -303,6 +304,7 @@ if st.button("Generate Report!"):
         summary_client_df = summary_client_df.sort_values(by='Avg Critical Hours Per Day', ascending=False)
     else:
         summary_client_df = pd.DataFrame()
+        st.warning("No client data found.")
 
     excel_data = generate_excel_report(pivot, summary_client_df, days_back, selected_days, business_start, business_end)
     file_name = f"{account_name}_impact_report_{from_dt.date()}_to_{to_dt.date()}_business_hours.xlsx"
