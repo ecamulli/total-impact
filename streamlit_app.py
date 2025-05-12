@@ -211,7 +211,8 @@ if st.button("Generate Report!"):
         try:
             r = requests.get(url, headers=headers, timeout=10)
             return r if r.status_code == 200 else None
-        except: return None
+        except:
+            return None
 
     def get_kpi_data(sa, net, code, band):
         local_results = []
@@ -221,7 +222,8 @@ if st.button("Generate Report!"):
             f_ts, t_ts = int(f.timestamp()*1000), int(t.timestamp()*1000)
             url = f"https://api-v2.7signal.com/kpis/sensors/service-areas/{sa['id']}?kpiCodes={code}&from={f_ts}&to={t_ts}&networkId={net['id']}&band={band_id}&averaging=ALL"
             r = safe_get(url)
-            if not r: continue
+            if not r:
+                continue
             for result in r.json().get("results", []):
                 band_key = {"2.4GHz": "measurements24GHz", "5GHz": "measurements5GHz", "6GHz": "measurements6GHz"}[band]
                 for m in result.get(band_key, []):
@@ -238,27 +240,27 @@ if st.button("Generate Report!"):
                         "SLA Value": sla
                     })
         return local_results
-    
+
     # Initialize pivot as empty DataFrame with expected columns
     pivot = pd.DataFrame(columns=["Service Area", "Network", "Band", "Total Samples", "Total Critical Samples", "Sampling Rate (samples/hr)", "Avg Critical Hours Per Day"])
 
-    # Only process sensor data if kpi_codes is not empty
+    # Process sensor data only if kpi_codes is provided
     if kpi_codes:
         results = []
         with ThreadPoolExecutor(max_workers=3) as ex:
             futures = [ex.submit(get_kpi_data, sa, net, code, band) for sa in service_areas for net in networks for code in kpi_codes for band in selected_bands]
             for f in as_completed(futures):
                 results.extend(f.result())
-    
+
         df = pd.DataFrame(results)
         if not df.empty:
             df["SLA Value"] = df["SLA Value"].round(4)
             df["SLA Value"] = df["SLA Value"].astype(float)
-    
+
             pivot_kpi = df.pivot_table(index=["Service Area", "Network", "Band"], columns="KPI Name", values="SLA Value", aggfunc="mean").reset_index()
             sla_columns = [col for col in pivot_kpi.columns if col not in ["Service Area", "Network", "Band"]]
             pivot_kpi[sla_columns] = pivot_kpi[sla_columns] / 100
-    
+
             summary = df.groupby(["Service Area", "Network", "Band"]).agg({
                 "Samples": "sum",
                 "Critical Samples": "sum"
@@ -267,15 +269,15 @@ if st.button("Generate Report!"):
             summary["Total Critical Samples"] = summary["Critical Samples"].round(0).astype(int)
             summary["Sampling Rate (samples/hr)"] = summary["Samples"] / (days_back * bh_per_day)
             summary["Avg Critical Hours Per Day"] = (summary["Critical Samples"] / summary["Samples"]) * bh_per_day
-    
+
             pivot = pivot_kpi.merge(summary.drop(columns=["Samples", "Critical Samples"]), on=["Service Area", "Network", "Band"])
             numeric_cols = pivot.select_dtypes(include="number").columns.tolist()
             cols_to_round_2 = [col for col in numeric_cols if col != "Total Critical Samples"]
             pivot[cols_to_round_2] = pivot[cols_to_round_2].round(2)
             pivot = pivot.sort_values(by="Avg Critical Hours Per Day", ascending=False).reset_index(drop=True)
         else:
-            st.warning("No KPI data found for the provided codes.")
-        
+            st.warning("No sensor data found for the provided KPI codes.")
+
     # ====== CLIENT SUMMARY REPORT ======
     client_rows = []
     for f, t in windows:
@@ -298,7 +300,7 @@ if st.button("Generate Report!"):
         summary_client_df = summary_client_df.merge(client_counts, on="Location", how="left")
         summary_client_df.insert(1, 'Client Count', summary_client_df.pop('Client Count'))
         summary_client_df.insert(2, 'Days Back', round(days_back, 2))
-        type_cols = [c for c in summary_client_df.columns if c not in ['Location', 'Client Count', 'Days Back']]
+        type_cols = [c for c in summary_client_df.columns if c not in ['Location', 'Client Count', "Days Back"]]
         summary_client_df[type_cols] = summary_client_df[type_cols].round(2).fillna(0)
         summary_client_df['Avg Critical Hours Per Day'] = summary_client_df[type_cols].mean(axis=1).round(2)
         summary_client_df = summary_client_df.sort_values(by='Avg Critical Hours Per Day', ascending=False)
@@ -306,6 +308,9 @@ if st.button("Generate Report!"):
         summary_client_df = pd.DataFrame()
         st.warning("No client data found.")
 
+    # Generate Excel report even if no data is available
+    if pivot.empty and summary_client_df.empty:
+        st.warning("No sensor or client data available. Generating report with metadata only.")
     excel_data = generate_excel_report(pivot, summary_client_df, days_back, selected_days, business_start, business_end)
     file_name = f"{account_name}_impact_report_{from_dt.date()}_to_{to_dt.date()}_business_hours.xlsx"
     st.download_button("Download Excel Report", data=excel_data, file_name=file_name, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
