@@ -15,6 +15,46 @@ console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.CRITICAL)
 logger.addHandler(console_handler)
 
+# KPI List Definition
+KPI_LIST = [
+    {"code": "HC005", "description": "Wi-Fi Connectivity"},
+    {"code": "HC007", "description": "Wi-Fi Quality"},
+    {"code": "HC008", "description": "Network Connectivity"},
+    {"code": "HC006", "description": "Network Quality"},
+    {"code": "AV008", "description": "Beacon availability"},
+    {"code": "AC001", "description": "Radio attach success rate"},
+    {"code": "AC004", "description": "Radio attach time"},
+    {"code": "RA103", "description": "Total EAP authentication success rate"},
+    {"code": "RA100", "description": "Total EAP authentication time"},
+    {"code": "AC002", "description": "DHCP success rate"},
+    {"code": "AC005", "description": "DHCP time"},
+    {"code": "DN002", "description": "Regular DNS query: Query success rate"},
+    {"code": "DN003", "description": "Regular DNS query: Successful query time"},
+    {"code": "QUAP005", "description": "VoIP MOS downlink (listening)"},
+    {"code": "QUAP006", "description": "VoIP MOS uplink (talking)"},
+    {"code": "QUAP008", "description": "HTTP DL throughput"},
+    {"code": "QUAP009", "description": "HTTP UL throughput"},
+    {"code": "QUAP013", "description": "Jitter in VoIP test"},
+    {"code": "QUAP015", "description": "Packet loss in VoIP test"},
+    {"code": "QUAP033", "description": "Jitter in VoIP uplink (talking) test"},
+    {"code": "QUAP034", "description": "Jitter in VoIP downlink (listening) test"},
+    {"code": "QUAP035", "description": "Packet loss in VoIP uplink (talking) test"},
+    {"code": "QUAP036", "description": "Packet loss in VoIP downlink (listening) test"},
+    {"code": "QUAP046", "description": "Web page download time"},
+    {"code": "QURT004", "description": "Ping RTT"},
+    {"code": "QURT007", "description": "Ping success rate"},
+    {"code": "QURT010", "description": "Ping default gateway RTT"},
+    {"code": "QURT011", "description": "Ping default gateway success rate"},
+    {"code": "TR003", "description": "Number of clients per AP"},
+    {"code": "TR062", "description": "Total air time utilization"},
+    {"code": "TR063", "description": "OFDMA air time utilization"},
+    {"code": "TR064", "description": "UL OFDMA air time utilization"},
+    {"code": "TR065", "description": "DL OFDMA air time utilization"},
+    {"code": "TR070", "description": "OFDMA traffic volume"},
+    {"code": "TR150", "description": "QBSS channel utilization"},
+    {"code": "TR151", "description": "QBSS station count"},
+]
+
 @st.cache_data
 def generate_excel_report(pivot, summary_client_df, days_back, selected_days, business_start, business_end):
     output = BytesIO()
@@ -36,7 +76,9 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
             if col in pivot.columns:
                 try:
                     idx = pivot.columns.get_loc(col)
-                    import xlsxwriter.utility
+                    import xlsxwri
+```python
+ter.utility
                     col_letter = xlsxwriter.utility.xl_col_to_name(idx)
                     num_format = "0" if col == "Total Critical Samples" else "0.00"
                     ws1.write_formula(
@@ -85,7 +127,16 @@ st.title("📊 7SIGNAL Total Impact Report")
 account_name = st.text_input("Account Name")
 client_id = st.text_input("Client ID")
 client_secret = st.text_input("Client Secret", type="password")
-kpi_codes_input = st.text_input("Enter up to 4 sensor KPI codes (comma-separated)")
+
+# KPI Selection
+kpi_options = [f"{kpi['code']} - {kpi['description']}" for kpi in KPI_LIST]
+selected_kpis = st.multiselect(
+    "Select up to 4 sensor KPI codes",
+    options=kpi_options,
+    default=None,
+    max_selections=4
+)
+kpi_codes = [opt.split(" - ")[0] for opt in selected_kpis] if selected_kpis else []
 
 if "networks" not in st.session_state:
     st.session_state.networks = []
@@ -205,7 +256,6 @@ if st.button("Generate Report!"):
     service_areas = requests.get("https://api-v2.7signal.com/topologies/sensors/serviceAreas", headers=headers).json().get("results", [])
     all_networks = requests.get("https://api-v2.7signal.com/networks/sensors", headers=headers).json().get("results", [])
     networks = [n for n in all_networks if n.get("name") in selected_networks]
-    kpi_codes = [k.strip() for k in kpi_codes_input.split(",") if k.strip()][:4] if kpi_codes_input.strip() else []
 
     def safe_get(url):
         try:
@@ -285,7 +335,8 @@ if st.button("Generate Report!"):
         client_url = f"https://api-v2.7signal.com/kpis/agents/locations?from={f_ts}&to={t_ts}&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE&includeClientCount=true"
         r = safe_get(client_url)
         if r:
-            for loc in r.json().get("results", []):
+            for loc adresin devamı:
+in r.json().get("results", []):
                 for t in loc.get("types", []):
                     client_rows.append({
                         "Location": loc.get("locationName"),
