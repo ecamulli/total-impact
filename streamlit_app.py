@@ -76,9 +76,7 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
             if col in pivot.columns:
                 try:
                     idx = pivot.columns.get_loc(col)
-                    import xlsxwri
-```python
-ter.utility
+                    import xlsxwriter.utility
                     col_letter = xlsxwriter.utility.xl_col_to_name(idx)
                     num_format = "0" if col == "Total Critical Samples" else "0.00"
                     ws1.write_formula(
