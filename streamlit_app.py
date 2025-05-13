@@ -333,8 +333,7 @@ if st.button("Generate Report!"):
         client_url = f"https://api-v2.7signal.com/kpis/agents/locations?from={f_ts}&to={t_ts}&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE&includeClientCount=true"
         r = safe_get(client_url)
         if r:
-            for loc adresin devamı:
-in r.json().get("results", []):
+            for loc in r.json().get("results", []):
                 for t in loc.get("types", []):
                     client_rows.append({
                         "Location": loc.get("locationName"),
