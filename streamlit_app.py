@@ -328,23 +328,31 @@ if st.button("Generate Report!"):
 
     # ====== CLIENT SUMMARY REPORT ======
     client_rows = []
+    client_count_dict = {}  # To store clientCount per location
     for f, t in windows:
         f_ts, t_ts = int(f.timestamp()*1000), int(t.timestamp()*1000)
         client_url = f"https://api-v2.7signal.com/kpis/agents/locations?from={f_ts}&to={t_ts}&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE&includeClientCount=true"
         r = safe_get(client_url)
         if r:
             for loc in r.json().get("results", []):
+                location_name = loc.get("locationName")
+                # Store clientCount (use max or last value to avoid double-counting)
+                client_count_dict[location_name] = loc.get("clientCount", 0)
                 for t in loc.get("types", []):
                     client_rows.append({
-                        "Location": loc.get("locationName"),
+                        "Location": location_name,
                         "Type": t.get("type").replace("_", " ").title(),
                         "Critical Hours Per Day": round((t.get("criticalSum") or 0) / 60 / days_back, 2)
                     })
-
+    
     if client_rows:
         client_df = pd.DataFrame(client_rows)
         summary_client_df = client_df.pivot_table(index="Location", columns="Type", values="Critical Hours Per Day", aggfunc="mean").reset_index()
-        client_counts = client_df.groupby("Location")["Critical Hours Per Day"].count().reset_index(name="Client Count")
+        # Create client_counts from client_count_dict
+        client_counts = pd.DataFrame([
+            {"Location": loc, "Client Count": count}
+            for loc, count in client_count_dict.items()
+        ])
         summary_client_df = summary_client_df.merge(client_counts, on="Location", how="left")
         summary_client_df.insert(1, 'Client Count', summary_client_df.pop('Client Count'))
         summary_client_df.insert(2, 'Days Back', round(days_back, 2))
@@ -355,7 +363,6 @@ if st.button("Generate Report!"):
     else:
         summary_client_df = pd.DataFrame()
         st.warning("No client data found.")
-
     # Generate Excel report even if no data is available
     if pivot.empty and summary_client_df.empty:
         st.warning("No sensor or client data available. Generating report with metadata only.")
