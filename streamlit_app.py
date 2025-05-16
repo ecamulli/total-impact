@@ -329,15 +329,27 @@ if st.button("Generate Report!"):
     # ====== CLIENT SUMMARY REPORT ======
     client_rows = []
     client_count_dict = {}  # To store clientCount per location
+    debug_api_responses = []  # For debugging API responses
+    
     for f, t in windows:
         f_ts, t_ts = int(f.timestamp()*1000), int(t.timestamp()*1000)
         client_url = f"https://api-v2.7signal.com/kpis/agents/locations?from={f_ts}&to={t_ts}&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE&includeClientCount=true"
         r = safe_get(client_url)
         if r:
-            for loc in r.json().get("results", []):
+            api_response = r.json()
+            debug_api_responses.append({
+                "from": f_ts,
+                "to": t_ts,
+                "results": api_response.get("results", [])
+            })
+            for loc in api_response.get("results", []):
                 location_name = loc.get("locationName")
-                # Store clientCount (use max or last value to avoid double-counting)
-                client_count_dict[location_name] = loc.get("clientCount", 0)
+                # Store clientCount only if not already set (or use max to handle variations)
+                if location_name not in client_count_dict:
+                    client_count_dict[location_name] = loc.get("clientCount", 0)
+                else:
+                    # Optional: Use max if API returns varying counts per window
+                    client_count_dict[location_name] = max(client_count_dict[location_name], loc.get("clientCount", 0))
                 for t in loc.get("types", []):
                     client_rows.append({
                         "Location": location_name,
@@ -345,14 +357,20 @@ if st.button("Generate Report!"):
                         "Critical Hours Per Day": round((t.get("criticalSum") or 0) / 60 / days_back, 2)
                     })
     
+    # Debug: Display API responses to check clientCount values
+    st.write("Debug API Responses:", debug_api_responses)
+    
     if client_rows:
         client_df = pd.DataFrame(client_rows)
         summary_client_df = client_df.pivot_table(index="Location", columns="Type", values="Critical Hours Per Day", aggfunc="mean").reset_index()
-        # Create client_counts from client_count_dict
+        # Create client_counts DataFrame
         client_counts = pd.DataFrame([
             {"Location": loc, "Client Count": count}
             for loc, count in client_count_dict.items()
         ])
+        # Debug: Display client_counts before merge
+        st.write("Debug client_counts:", client_counts)
+        # Merge with summary_client_df
         summary_client_df = summary_client_df.merge(client_counts, on="Location", how="left")
         summary_client_df.insert(1, 'Client Count', summary_client_df.pop('Client Count'))
         summary_client_df.insert(2, 'Days Back', round(days_back, 2))
@@ -363,6 +381,7 @@ if st.button("Generate Report!"):
     else:
         summary_client_df = pd.DataFrame()
         st.warning("No client data found.")
+        
     # Generate Excel report even if no data is available
     if pivot.empty and summary_client_df.empty:
         st.warning("No sensor or client data available. Generating report with metadata only.")
