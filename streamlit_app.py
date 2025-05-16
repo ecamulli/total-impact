@@ -92,14 +92,23 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
             ws2 = writer.sheets["Agent Summary Report"]
             total_row_2 = len(summary_client_df) + 1
             ws2.write(total_row_2, 0, "Total")
-            if "Avg Critical Hours Per Day" in summary_client_df.columns:
-                avg_idx = summary_client_df.columns.get_loc("Avg Critical Hours Per Day")
-                col_letter = chr(ord('A') + avg_idx)
-                ws2.write_formula(
-                    total_row_2, avg_idx,
-                    f"=SUM({col_letter}2:{col_letter}{total_row_2})",
-                    writer.book.add_format({"num_format": "0.00"})
-                )
+            
+            # Add totals for all columns except "Days Back" and "Location"
+            for col in summary_client_df.columns:
+                if col in ["Days Back", "Location"]:  # Skip these columns
+                    continue
+                try:
+                    idx = summary_client_df.columns.get_loc(col)
+                    col_letter = xlsxwriter.utility.xl_col_to_name(idx)
+                    # Set number format: integer for "Client Count," two decimals for others
+                    num_format = "0" if col == "Client Count" else "0.00"
+                    ws2.write_formula(
+                        total_row_2, idx,
+                        f"=SUM({col_letter}2:{col_letter}{total_row_2})",
+                        writer.book.add_format({"num_format": num_format})
+                    )
+                except ValueError:
+                    logger.warning(f"Column '{col}' not found or caused error in Excel export.")
 
         for sheet_name, data in {
             "Report Info": metadata,
