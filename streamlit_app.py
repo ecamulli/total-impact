@@ -322,7 +322,7 @@ if st.button("Generate Report!"):
                 "Samples": "sum",
                 "Critical Samples": "sum"
             }).reset_index()
-            summary["Total Samples"] = summary["Samples"].round(2)
+            summary["Total Samples"] = summary["Samples"].round(0)
             summary["Total Critical Samples"] = summary["Critical Samples"].round(0).astype(int)
             summary["Sampling Rate (samples/hr)"] = summary["Samples"] / (days_back * bh_per_day)
             summary["Avg Critical Hours Per Day"] = (summary["Critical Samples"] / summary["Samples"]) * bh_per_day
