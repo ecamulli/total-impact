@@ -358,7 +358,7 @@ if st.button("Generate Report!"):
                     })
     
     # Debug: Display API responses to check clientCount values
-    st.write("Debug API Responses:", debug_api_responses)
+    # st.write("Debug API Responses:", debug_api_responses)
     
     if client_rows:
         client_df = pd.DataFrame(client_rows)
@@ -369,7 +369,7 @@ if st.button("Generate Report!"):
             for loc, count in client_count_dict.items()
         ])
         # Debug: Display client_counts before merge
-        st.write("Debug client_counts:", client_counts)
+        # st.write("Debug client_counts:", client_counts)
         # Merge with summary_client_df
         summary_client_df = summary_client_df.merge(client_counts, on="Location", how="left")
         summary_client_df.insert(1, 'Client Count', summary_client_df.pop('Client Count'))
