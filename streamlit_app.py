@@ -68,8 +68,8 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
         })
         metadata.to_excel(writer, sheet_name="Report Info", index=False)
 
-        pivot.to_excel(writer, sheet_name="Summary Sensor Report", index=False)
-        ws1 = writer.sheets["Summary Sensor Report"]
+        pivot.to_excel(writer, sheet_name="Sensor Summary Report", index=False)
+        ws1 = writer.sheets["Sensor Summary Report"]
         total_row_1 = len(pivot) + 1
         ws1.write(total_row_1, 0, "Total")
         for col in ["Total Samples", "Total Critical Samples", "Avg Critical Hours Per Day"]:
@@ -88,8 +88,8 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
                     logger.warning(f"Column '{col}' not found or caused error in Excel export.")
 
         if not summary_client_df.empty:
-            summary_client_df.to_excel(writer, sheet_name="Summary Client Report", index=False)
-            ws2 = writer.sheets["Summary Client Report"]
+            summary_client_df.to_excel(writer, sheet_name="Agent Summary Report", index=False)
+            ws2 = writer.sheets["Agent Summary Report"]
             total_row_2 = len(summary_client_df) + 1
             ws2.write(total_row_2, 0, "Total")
             if "Avg Critical Hours Per Day" in summary_client_df.columns:
@@ -103,8 +103,8 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
 
         for sheet_name, data in {
             "Report Info": metadata,
-            "Summary Sensor Report": pivot,
-            "Summary Client Report": summary_client_df
+            "Sensor Summary Report": pivot,
+            "Agent Summary Report": summary_client_df
         }.items():
             if not data.empty:
                 worksheet = writer.sheets[sheet_name]
