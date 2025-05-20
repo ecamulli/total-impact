@@ -68,39 +68,37 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
         })
         metadata.to_excel(writer, sheet_name="Report Info", index=False)
 
-        pivot.to_excel(writer, sheet_name="Sensor Summary Report", index=False)
-        ws1 = writer.sheets["Sensor Summary Report"]
-        total_row_1 = len(pivot) + 1
-        ws1.write(total_row_1, 0, "Total")
-        for col in ["Total Samples", "Total Critical Samples", "Avg Critical Hours Per Day"]:
-            if col in pivot.columns:
-                try:
-                    idx = pivot.columns.get_loc(col)
-                    import xlsxwriter.utility
-                    col_letter = xlsxwriter.utility.xl_col_to_name(idx)
-                    num_format = "0" if col == "Total Critical Samples" else "0.00"
-                    ws1.write_formula(
-                        total_row_1, idx,
-                        f"=SUM({col_letter}2:{col_letter}{total_row_1})",
-                        writer.book.add_format({"num_format": num_format})
-                    )
-                except ValueError:
-                    logger.warning(f"Column '{col}' not found or caused error in Excel export.")
+        if not pivot.empty:
+            pivot.to_excel(writer, sheet_name="Sensor Summary Report", index=False)
+            ws1 = writer.sheets["Sensor Summary Report"]
+            total_row_1 = len(pivot) + 1
+            ws1.write(total_row_1, 0, "Total")
+            for col in ["Total Samples", "Total Critical Samples", "Avg Critical Hours Per Day"]:
+                if col in pivot.columns:
+                    try:
+                        idx = pivot.columns.get_loc(col)
+                        import xlsxwriter.utility
+                        col_letter = xlsxwriter.utility.xl_col_to_name(idx)
+                        num_format = "0" if col == "Total Critical Samples" else "0.00"
+                        ws1.write_formula(
+                            total_row_1, idx,
+                            f"=SUM({col_letter}2:{col_letter}{total_row_1})",
+                            writer.book.add_format({"num_format": num_format})
+                        )
+                    except ValueError:
+                        logger.warning(f"Column '{col}' not found or caused error in Excel export.")
 
         if not summary_client_df.empty:
             summary_client_df.to_excel(writer, sheet_name="Agent Summary Report", index=False)
             ws2 = writer.sheets["Agent Summary Report"]
             total_row_2 = len(summary_client_df) + 1
             ws2.write(total_row_2, 0, "Total")
-            
-            # Add totals for all columns except "Days Back" and "Location"
             for col in summary_client_df.columns:
-                if col in ["Days Back", "Location"]:  # Skip these columns
+                if col in ["Days Back", "Location"]:
                     continue
                 try:
                     idx = summary_client_df.columns.get_loc(col)
                     col_letter = xlsxwriter.utility.xl_col_to_name(idx)
-                    # Set number format: integer for "Client Count," two decimals for others
                     num_format = "0" if col == "Client Count" else "0.00"
                     ws2.write_formula(
                         total_row_2, idx,
@@ -185,8 +183,8 @@ else:
 if st.session_state.networks:
     selected_networks = st.multiselect("Select Networks", options=st.session_state.networks, default=st.session_state.networks)
 else:
-    st.error("No networks available. Please check your credentials or API connectivity.")
-    st.stop()
+    st.warning("No sensor networks found. Proceeding with agent data report.")
+    selected_networks = []
 
 # Add Band Selector
 band_options = ["2.4GHz", "5GHz", "6GHz"]
@@ -301,8 +299,8 @@ if st.button("Generate Report!"):
     # Initialize pivot as empty DataFrame with expected columns
     pivot = pd.DataFrame(columns=["Service Area", "Network", "Band", "Total Samples", "Total Critical Samples", "Sampling Rate (samples/hr)", "Avg Critical Hours Per Day"])
 
-    # Process sensor data only if kpi_codes is provided
-    if kpi_codes:
+    # Process sensor data only if networks are available and kpi_codes is provided
+    if networks and kpi_codes:
         results = []
         with ThreadPoolExecutor(max_workers=3) as ex:
             futures = [ex.submit(get_kpi_data, sa, net, code, band) for sa in service_areas for net in networks for code in kpi_codes for band in selected_bands]
@@ -334,11 +332,13 @@ if st.button("Generate Report!"):
             pivot = pivot.sort_values(by="Avg Critical Hours Per Day", ascending=False).reset_index(drop=True)
         else:
             st.warning("No sensor data found for the provided KPI codes.")
+    elif not networks:
+        st.info("No sensor networks found. Generating report with agent data only.")
 
     # ====== CLIENT SUMMARY REPORT ======
     client_rows = []
-    client_count_dict = {}  # To store clientCount per location
-    debug_api_responses = []  # For debugging API responses
+    client_count_dict = {}
+    debug_api_responses = []
     
     for f, t in windows:
         f_ts, t_ts = int(f.timestamp()*1000), int(t.timestamp()*1000)
@@ -353,11 +353,9 @@ if st.button("Generate Report!"):
             })
             for loc in api_response.get("results", []):
                 location_name = loc.get("locationName")
-                # Store clientCount only if not already set (or use max to handle variations)
                 if location_name not in client_count_dict:
                     client_count_dict[location_name] = loc.get("clientCount", 0)
                 else:
-                    # Optional: Use max if API returns varying counts per window
                     client_count_dict[location_name] = max(client_count_dict[location_name], loc.get("clientCount", 0))
                 for t in loc.get("types", []):
                     client_rows.append({
@@ -366,20 +364,13 @@ if st.button("Generate Report!"):
                         "Critical Hours Per Day": round((t.get("criticalSum") or 0) / 60 / days_back, 2)
                     })
     
-    # Debug: Display API responses to check clientCount values
-    # st.write("Debug API Responses:", debug_api_responses)
-    
     if client_rows:
         client_df = pd.DataFrame(client_rows)
         summary_client_df = client_df.pivot_table(index="Location", columns="Type", values="Critical Hours Per Day", aggfunc="mean").reset_index()
-        # Create client_counts DataFrame
         client_counts = pd.DataFrame([
             {"Location": loc, "Client Count": count}
             for loc, count in client_count_dict.items()
         ])
-        # Debug: Display client_counts before merge
-        # st.write("Debug client_counts:", client_counts)
-        # Merge with summary_client_df
         summary_client_df = summary_client_df.merge(client_counts, on="Location", how="left")
         summary_client_df.insert(1, 'Client Count', summary_client_df.pop('Client Count'))
         summary_client_df.insert(2, 'Days Back', round(days_back, 2))
