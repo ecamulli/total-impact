@@ -17,8 +17,8 @@ logger.addHandler(console_handler)
 
 # KPI List Definition
 KPI_LIST = [
-    {"code": "HC005", "description": "Wi-Fi Connectivity"},
     {"code": "HC007", "description": "Wi-Fi Quality"},
+    {"code": "HC005", "description": "Wi-Fi Connectivity"},
     {"code": "HC008", "description": "Network Connectivity"},
     {"code": "HC006", "description": "Network Quality"},
     {"code": "AV008", "description": "Beacon availability"},
