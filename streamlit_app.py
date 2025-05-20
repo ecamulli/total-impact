@@ -77,8 +77,8 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
                 if col in pivot.columns:
                     try:
                         idx = pivot.columns.get_loc(col)
-                        import xlsxwriter.utility
-                        col_letter = xlsxwriter.utility.xl_col_to_name(idx)
+                        from xlsxwriter import xl_col_to_name
+                        col_letter = xl_col_to_name(idx)
                         num_format = "0" if col == "Total Critical Samples" else "0.00"
                         ws1.write_formula(
                             total_row_1, idx,
@@ -98,7 +98,8 @@ def generate_excel_report(pivot, summary_client_df, days_back, selected_days, bu
                     continue
                 try:
                     idx = summary_client_df.columns.get_loc(col)
-                    col_letter = xlsxwriter.utility.xl_col_to_name(idx)
+                    from xlsxwriter import xl_col_to_name
+                    col_letter = xl_col_to_name(idx)
                     num_format = "0" if col == "Client Count" else "0.00"
                     ws2.write_formula(
                         total_row_2, idx,
