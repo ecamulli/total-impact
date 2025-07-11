@@ -343,7 +343,7 @@ if st.button("Generate Report!"):
     
     for f, t in windows:
         f_ts, t_ts = int(f.timestamp()*1000), int(t.timestamp()*1000)
-        client_url = f"https://api-v2.7signal.com/kpis/agents/locations?from={f_ts}&to={t_ts}&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE&type=RF_PROBLEM&type=CONGESTION&type=COVERAGE&includeClientCount=true"
+        client_url = f"https://api-v2.7signal.com/kpis/agents/locations?from={f_ts}&to={t_ts}&type=ROAMING&type=ADJACENT_CHANNEL_INTERFERENCE&type=CO_CHANNEL_INTERFERENCE&type=CONGESTION&type=COVERAGE&includeClientCount=true"
         r = safe_get(client_url)
         if r:
             api_response = r.json()
