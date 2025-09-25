@@ -245,8 +245,8 @@ days_back = total_hours / bh_per_day
 if days_back == 0:
     st.error("No valid business hours selected")
     st.stop()
-if days_back > 30:
-    st.error("Range exceeds 30 business days")
+if days_back > 32:
+    st.error("Range exceeds 1 month")
     st.stop()
 
 st.markdown(f"**{days_back:.2f} business days selected**")
