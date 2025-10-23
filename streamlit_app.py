@@ -205,8 +205,8 @@ if use_24_hours:
     business_start = datetime.strptime("00:00", "%H:%M").time()
     business_end = datetime.strptime("23:59", "%H:%M").time()
 else:
-    business_start = st.time_input("Start Time", value=datetime.strptime("08:00", "%H:%M").time())
-    business_end = st.time_input("End Time", value=datetime.strptime("18:00", "%H:%M").time())
+    business_start = st.time_input("Start Time", value=datetime.strptime("06:00", "%H:%M").time())
+    business_end = st.time_input("End Time", value=datetime.strptime("20:00", "%H:%M").time())
 
 from_dt = eastern.localize(datetime.combine(from_date, business_start))
 to_dt = eastern.localize(datetime.combine(to_date, business_end))
