@@ -303,7 +303,7 @@ if st.button("Generate Report!"):
     # Process sensor data only if networks are available and kpi_codes is provided
     if networks and kpi_codes:
         results = []
-        with ThreadPoolExecutor(max_workers=3) as ex:
+        with ThreadPoolExecutor(max_workers=2) as ex:
             futures = [ex.submit(get_kpi_data, sa, net, code, band) for sa in service_areas for net in networks for code in kpi_codes for band in selected_bands]
             for f in as_completed(futures):
                 results.extend(f.result())
