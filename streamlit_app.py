@@ -147,93 +147,85 @@ kpi_codes = [opt.split(" - ")[0] for opt in selected_kpis] if selected_kpis else
 if "networks" not in st.session_state:
     st.session_state.networks = []
 
+# OPTIMIZATION 1: Add session for connection pooling
+@st.cache_resource
+def get_session():
+    """Create a session with connection pooling for better performance"""
+    session = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(
+        pool_connections=10,
+        pool_maxsize=20,
+        max_retries=3
+    )
+    session.mount('https://', adapter)
+    return session
+
 def authenticate(cid, secret):
+    """Authenticate with 7SIGNAL API"""
     try:
-        r = requests.post(
+        session = get_session()
+        r = session.post(
             "https://api-v2.7signal.com/oauth2/token",
             data={"client_id": cid, "client_secret": secret, "grant_type": "client_credentials"},
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=10
         )
-        return r.json().get("access_token") if r.status_code == 200 else None
+        if r.status_code == 200:
+            return r.json().get("access_token")
     except Exception as e:
-        logger.error(f"Authentication error: {e}")
-        return None
+        logger.error(f"Auth failed: {e}")
+    return None
 
-def get_networks(headers):
-    try:
-        response = requests.get("https://api-v2.7signal.com/networks/sensors", headers=headers, timeout=10)
-        response.raise_for_status()
-        networks = response.json().get("results", [])
-        return sorted({n.get("name", "").strip() for n in networks if n.get("name")})
-    except requests.RequestException as e:
-        logger.error(f"Failed to fetch networks: {e}")
-        return []
-
-if client_id and client_secret:
+if st.button("Load Networks"):
     token = authenticate(client_id, client_secret)
     if token:
+        session = get_session()
         headers = {"Authorization": f"Bearer {token}"}
-        st.session_state.networks = get_networks(headers)
-    else:
-        st.error("Authentication failed. Please check your Client ID and Client Secret.")
-        st.stop()
-else:
-    st.warning("Please enter Client ID and Client Secret to fetch available networks.")
-    st.stop()
+        try:
+            r = session.get("https://api-v2.7signal.com/networks/sensors", headers=headers, timeout=10)
+            if r.status_code == 200:
+                networks = [n["name"] for n in r.json().get("results", [])]
+                st.session_state.networks = sorted(networks)
+        except Exception as e:
+            st.error(f"Failed to load networks: {e}")
 
-if st.session_state.networks:
-    selected_networks = st.multiselect("Select Networks", options=st.session_state.networks, default=st.session_state.networks)
-else:
-    st.warning("No sensor networks found. Proceeding with agent data report.")
-    selected_networks = []
+selected_networks = st.multiselect("Select Networks", options=st.session_state.networks)
+selected_bands = st.multiselect("Select Bands", options=["2.4GHz", "5GHz", "6GHz"], default=["2.4GHz", "5GHz"])
+selected_days = st.multiselect("Select Days", options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], default=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
 
-# Add Band Selector
-band_options = ["2.4GHz", "5GHz", "6GHz"]
-selected_bands = st.multiselect("Select Bands", options=band_options, default=band_options)
+col1, col2 = st.columns(2)
+with col1:
+    business_start_hour = st.number_input("Business Start Hour (0-23)", min_value=0, max_value=23, value=8)
+    business_start_minute = st.number_input("Business Start Minute (0-59)", min_value=0, max_value=59, value=0)
+with col2:
+    business_end_hour = st.number_input("Business End Hour (0-23)", min_value=0, max_value=23, value=17)
+    business_end_minute = st.number_input("Business End Minute (0-59)", min_value=0, max_value=59, value=0)
 
-eastern = pytz.timezone("US/Eastern")
-now_et = datetime.now(eastern)
-def_start = now_et - timedelta(days=7)
-from_date = st.date_input("From Date", value=def_start.date())
-to_date = st.date_input("To Date", value=now_et.date())
-
-days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-selected_days = st.multiselect("Select days", options=days_of_week, default=days_of_week[:5])
-
-use_24_hours = st.checkbox("Use 24 Hours", value=False)
-if use_24_hours:
-    business_start = datetime.strptime("00:00", "%H:%M").time()
-    business_end = datetime.strptime("23:59", "%H:%M").time()
-else:
-    business_start = st.time_input("Start Time", value=datetime.strptime("06:00", "%H:%M").time())
-    business_end = st.time_input("End Time", value=datetime.strptime("20:00", "%H:%M").time())
-
-from_dt = eastern.localize(datetime.combine(from_date, business_start))
-to_dt = eastern.localize(datetime.combine(to_date, business_end))
-
-if not use_24_hours and business_end <= business_start:
-    st.error("End must be after Start")
-    st.stop()
-
+business_start = datetime.strptime(f"{business_start_hour}:{business_start_minute}", "%H:%M").time()
+business_end = datetime.strptime(f"{business_end_hour}:{business_end_minute}", "%H:%M").time()
 bh_per_day = (datetime.combine(datetime.today(), business_end) - datetime.combine(datetime.today(), business_start)).total_seconds() / 3600
-if bh_per_day <= 0:
-    st.error("Invalid hours range")
-    st.stop()
 
-if to_date > now_et.date():
-    st.error("'To' date is in future")
-    st.stop()
-if from_date > to_date:
-    st.error("'From' date is after 'To'")
-    st.stop()
+col3, col4 = st.columns(2)
+with col3:
+    from_date = st.date_input("From Date", value=datetime.today() - timedelta(days=14))
+with col4:
+    to_date = st.date_input("To Date", value=datetime.today() - timedelta(days=1))
 
-windows, total_hours = [], 0
-cur_date = from_dt.date()
-while cur_date <= to_dt.date():
-    day_name = cur_date.strftime("%A")
-    if day_name in selected_days:
-        s = eastern.localize(datetime.combine(cur_date, business_start))
-        e = eastern.localize(datetime.combine(cur_date, business_end))
+et = pytz.timezone("US/Eastern")
+from_dt = et.localize(datetime.combine(from_date, business_start))
+to_dt = et.localize(datetime.combine(to_date, business_end))
+
+# Calculate business days and windows
+day_map = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3, "Friday": 4, "Saturday": 5, "Sunday": 6}
+selected_weekdays = {day_map[d] for d in selected_days}
+windows = []
+total_hours = 0
+cur_date = from_date
+
+while cur_date <= to_date:
+    if cur_date.weekday() in selected_weekdays:
+        s = et.localize(datetime.combine(cur_date, business_start))
+        e = et.localize(datetime.combine(cur_date, business_end))
         if s < from_dt: s = from_dt
         if e > to_dt: e = to_dt
         if s < e:
@@ -258,30 +250,52 @@ if st.button("Generate Report!"):
         st.error("Authentication failed.")
         st.stop()
 
+    session = get_session()
     headers = {"Authorization": f"Bearer {token}"}
-    service_areas = requests.get("https://api-v2.7signal.com/topologies/sensors/serviceAreas", headers=headers).json().get("results", [])
-    all_networks = requests.get("https://api-v2.7signal.com/networks/sensors", headers=headers).json().get("results", [])
-    networks = [n for n in all_networks if n.get("name") in selected_networks]
+    
+    # OPTIMIZATION 2: Use progress bar for better UX
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    status_text.text("Loading service areas and networks...")
+    progress_bar.progress(10)
+    
+    try:
+        service_areas = session.get("https://api-v2.7signal.com/topologies/sensors/serviceAreas", headers=headers, timeout=10).json().get("results", [])
+        all_networks = session.get("https://api-v2.7signal.com/networks/sensors", headers=headers, timeout=10).json().get("results", [])
+        networks = [n for n in all_networks if n.get("name") in selected_networks]
+    except Exception as e:
+        st.error(f"Failed to load base data: {e}")
+        st.stop()
+    
+    progress_bar.progress(20)
 
     def safe_get(url):
+        """Wrapper for safe API calls with session"""
         try:
-            r = requests.get(url, headers=headers, timeout=10)
+            r = session.get(url, headers=headers, timeout=10)
             return r if r.status_code == 200 else None
         except:
             return None
 
-    def get_kpi_data(sa, net, code, band):
+    # OPTIMIZATION 3: Batch KPI requests by combining all codes in one API call
+    def get_kpi_data_batch(sa, net, codes, band, window_list):
+        """Fetch all KPI codes in a single request per window"""
         local_results = []
         band_map = {"2.4GHz": "2.4", "5GHz": "5", "6GHz": "6"}
         band_id = band_map[band]
-        for f, t in windows:
+        band_key = {"2.4GHz": "measurements24GHz", "5GHz": "measurements5GHz", "6GHz": "measurements6GHz"}[band]
+        
+        # Combine all KPI codes into single request
+        kpi_params = "&".join([f"kpiCodes={code}" for code in codes])
+        
+        for f, t in window_list:
             f_ts, t_ts = int(f.timestamp()*1000), int(t.timestamp()*1000)
-            url = f"https://api-v2.7signal.com/kpis/sensors/service-areas/{sa['id']}?kpiCodes={code}&from={f_ts}&to={t_ts}&networkId={net['id']}&band={band_id}&averaging=ALL"
+            url = f"https://api-v2.7signal.com/kpis/sensors/service-areas/{sa['id']}?{kpi_params}&from={f_ts}&to={t_ts}&networkId={net['id']}&band={band_id}&averaging=ALL"
             r = safe_get(url)
             if not r:
                 continue
             for result in r.json().get("results", []):
-                band_key = {"2.4GHz": "measurements24GHz", "5GHz": "measurements5GHz", "6GHz": "measurements6GHz"}[band]
                 for m in result.get(band_key, []):
                     samples = m.get("samples", 0)
                     sla = m.get("slaValue", 0)
@@ -302,16 +316,33 @@ if st.button("Generate Report!"):
 
     # Process sensor data only if networks are available and kpi_codes is provided
     if networks and kpi_codes:
+        status_text.text("Fetching sensor KPI data...")
+        progress_bar.progress(30)
+        
         results = []
-        with ThreadPoolExecutor(max_workers=2) as ex:
-            futures = [ex.submit(get_kpi_data, sa, net, code, band) for sa in service_areas for net in networks for code in kpi_codes for band in selected_bands]
+        # OPTIMIZATION 4: Increase worker count and batch requests
+        with ThreadPoolExecutor(max_workers=10) as ex:
+            # Submit batched requests (all KPIs per SA/network/band combination)
+            futures = [
+                ex.submit(get_kpi_data_batch, sa, net, kpi_codes, band, windows) 
+                for sa in service_areas 
+                for net in networks 
+                for band in selected_bands
+            ]
+            
+            completed = 0
+            total_futures = len(futures)
             for f in as_completed(futures):
                 results.extend(f.result())
+                completed += 1
+                progress_bar.progress(30 + int(30 * completed / total_futures))
 
+        status_text.text("Processing sensor data...")
+        progress_bar.progress(65)
+        
         df = pd.DataFrame(results)
         if not df.empty:
-            df["SLA Value"] = df["SLA Value"].round(4)
-            df["SLA Value"] = df["SLA Value"].astype(float)
+            df["SLA Value"] = df["SLA Value"].round(4).astype(float)
 
             pivot_kpi = df.pivot_table(index=["Service Area", "Network", "Band"], columns="KPI Name", values="SLA Value", aggfunc="mean").reset_index()
             sla_columns = [col for col in pivot_kpi.columns if col not in ["Service Area", "Network", "Band"]]
@@ -337,9 +368,11 @@ if st.button("Generate Report!"):
         st.info("No sensor networks found. Generating report with agent data only.")
 
     # ====== CLIENT SUMMARY REPORT ======
+    status_text.text("Fetching agent data...")
+    progress_bar.progress(70)
+    
     client_rows = []
     client_count_dict = {}
-    debug_api_responses = []
     
     for f, t in windows:
         f_ts, t_ts = int(f.timestamp()*1000), int(t.timestamp()*1000)
@@ -347,11 +380,6 @@ if st.button("Generate Report!"):
         r = safe_get(client_url)
         if r:
             api_response = r.json()
-            debug_api_responses.append({
-                "from": f_ts,
-                "to": t_ts,
-                "results": api_response.get("results", [])
-            })
             for loc in api_response.get("results", []):
                 location_name = loc.get("locationName")
                 if location_name not in client_count_dict:
@@ -364,6 +392,9 @@ if st.button("Generate Report!"):
                         "Type": t.get("type").replace("_", " ").title(),
                         "Critical Hours Per Day": round((t.get("criticalSum") or 0) / 60 / days_back, 2)
                     })
+    
+    progress_bar.progress(85)
+    status_text.text("Processing agent data...")
     
     if client_rows:
         client_df = pd.DataFrame(client_rows)
@@ -382,10 +413,19 @@ if st.button("Generate Report!"):
     else:
         summary_client_df = pd.DataFrame()
         st.warning("No client data found.")
-        
+    
+    progress_bar.progress(95)
+    status_text.text("Generating Excel report...")
+    
     # Generate Excel report even if no data is available
     if pivot.empty and summary_client_df.empty:
         st.warning("No sensor or client data available. Generating report with metadata only.")
     excel_data = generate_excel_report(pivot, summary_client_df, days_back, selected_days, business_start, business_end)
     file_name = f"{account_name}_impact_report_{from_dt.date()}_to_{to_dt.date()}_business_hours.xlsx"
+    
+    progress_bar.progress(100)
+    status_text.text("Report ready!")
+    
+    st.success("✅ Report generated successfully!")
     st.download_button("Download Excel Report", data=excel_data, file_name=file_name, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    
