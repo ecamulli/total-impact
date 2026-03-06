@@ -6,6 +6,9 @@ from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pytz
 import logging
+import time
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # ========== CONFIG ==========
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", filename="impact_report.log")
@@ -147,15 +150,25 @@ kpi_codes = [opt.split(" - ")[0] for opt in selected_kpis] if selected_kpis else
 if "networks" not in st.session_state:
     st.session_state.networks = []
 
-# OPTIMIZATION 1: Add session for connection pooling
+# OPTIMIZATION 1: Add session for connection pooling with smart retry logic
 @st.cache_resource
 def get_session():
-    """Create a session with connection pooling for better performance"""
+    """Create a session with connection pooling and intelligent retry strategy"""
     session = requests.Session()
-    adapter = requests.adapters.HTTPAdapter(
+    
+    # Configure retry strategy for different error types
+    retry_strategy = Retry(
+        total=5,  # Maximum number of retries
+        backoff_factor=2,  # Exponential backoff: 2, 4, 8, 16, 32 seconds
+        status_forcelist=[429, 500, 502, 503, 504],  # Retry on these status codes
+        allowed_methods=["GET", "POST"],  # Retry on these methods
+        raise_on_status=False  # Don't raise exception, let us handle it
+    )
+    
+    adapter = HTTPAdapter(
         pool_connections=10,
         pool_maxsize=20,
-        max_retries=3
+        max_retries=retry_strategy
     )
     session.mount('https://', adapter)
     return session
@@ -270,13 +283,76 @@ if st.button("Generate Report!"):
     
     progress_bar.progress(20)
 
-    def safe_get(url):
-        """Wrapper for safe API calls with session"""
-        try:
-            r = session.get(url, headers=headers, timeout=10)
-            return r if r.status_code == 200 else None
-        except:
-            return None
+    def safe_get(url, max_retries=3, retry_delay=1):
+        """
+        Wrapper for safe API calls with session, throttling detection, and exponential backoff
+        
+        Handles:
+        - 429 (Too Many Requests) with exponential backoff
+        - 5xx server errors with retry
+        - Connection errors with retry
+        """
+        session = get_session()
+        
+        for attempt in range(max_retries):
+            try:
+                r = session.get(url, headers=headers, timeout=15)
+                
+                # Success
+                if r.status_code == 200:
+                    return r
+                
+                # Rate limiting - wait longer
+                elif r.status_code == 429:
+                    retry_after = int(r.headers.get('Retry-After', retry_delay * (2 ** attempt)))
+                    logger.warning(f"Rate limited (429). Waiting {retry_after}s before retry {attempt + 1}/{max_retries}")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_after)
+                        continue
+                    else:
+                        logger.error(f"Rate limit exceeded after {max_retries} attempts: {url}")
+                        return None
+                
+                # Server errors - retry with exponential backoff
+                elif r.status_code >= 500:
+                    wait_time = retry_delay * (2 ** attempt)
+                    logger.warning(f"Server error {r.status_code}. Waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
+                    if attempt < max_retries - 1:
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        logger.error(f"Server error persisted after {max_retries} attempts: {url}")
+                        return None
+                
+                # Client errors (4xx except 429) - don't retry
+                elif 400 <= r.status_code < 500:
+                    logger.error(f"Client error {r.status_code}: {url}")
+                    return None
+                
+                # Other errors
+                else:
+                    logger.warning(f"Unexpected status {r.status_code}: {url}")
+                    return None
+                    
+            except requests.exceptions.Timeout:
+                logger.warning(f"Timeout on attempt {attempt + 1}/{max_retries}: {url}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (2 ** attempt))
+                    continue
+                return None
+                
+            except requests.exceptions.ConnectionError as e:
+                logger.warning(f"Connection error on attempt {attempt + 1}/{max_retries}: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (2 ** attempt))
+                    continue
+                return None
+                
+            except Exception as e:
+                logger.error(f"Unexpected error: {e}")
+                return None
+        
+        return None
 
     # OPTIMIZATION 3: Batch KPI requests by combining all codes in one API call
     def get_kpi_data_batch(sa, net, codes, band, window_list):
@@ -320,7 +396,8 @@ if st.button("Generate Report!"):
         progress_bar.progress(30)
         
         results = []
-        # OPTIMIZATION 4: Increase worker count and batch requests
+        # OPTIMIZATION 4: Increase worker count for parallel processing
+        # Note: safe_get() handles rate limiting with exponential backoff
         with ThreadPoolExecutor(max_workers=10) as ex:
             # Submit batched requests (all KPIs per SA/network/band combination)
             futures = [
@@ -428,4 +505,3 @@ if st.button("Generate Report!"):
     
     st.success("✅ Report generated successfully!")
     st.download_button("Download Excel Report", data=excel_data, file_name=file_name, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    
